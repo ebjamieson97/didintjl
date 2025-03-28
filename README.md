@@ -7,6 +7,9 @@ undidjl allows for estimation of difference-in-differences with covariates that 
 ```stata
 net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/")
 ```
+didintjl may run slow the first time it is run if the DiDInt.jl package for Julia is not already downloaded. didintjl will automatically download the DiDInt.jl package for Julia if it is not found to be downloaded already.
+
+
 ### Update
 ```stata
 ado uninstall undidjl
