@@ -1,0 +1,19 @@
+d 'DIDINTJL': Intersection difference-in-differences, Stata wrapper for DiDInt.jl
+d 
+d The didintjl function estimates the average effect of treatment on the treated (ATT)
+d while accounting for covariates that may vary by state, time, or by both state and time simultaneously.
+d
+d
+d KW: didint
+d KW: ccc
+d KW: difference in differences
+d
+d
+d Requires: Stata 16 or later
+d
+d Author: Eric Jamieson
+d Support: ericbrucejamieson@gmail.com
+d 
+d
+f didintjl.ado
+f didintjl.sthlp
