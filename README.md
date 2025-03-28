@@ -12,8 +12,8 @@ didintjl may run slow the first time it is run if the DiDInt.jl package for Juli
 
 ### Update
 ```stata
-ado uninstall undidjl
-net install undidjl, from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/")
+ado uninstall didintjl
+net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/")
 ```
 
 ## Requirements
