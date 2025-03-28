@@ -58,7 +58,7 @@ program define didintjl
 		local counter = `counter' + 1
 		macro shift
     }
-    qui tokenize "`treated_times'"
+    qui tokenize "`treatment_times'"
     while "`1'" != "" {
         global treated_times_to_julia "`1'"
 		qui jl: push!(treated_times, "$treated_times_to_julia")
