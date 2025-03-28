@@ -123,6 +123,10 @@ program define didintjl
         qui jl: ref = Dict(zip(ref_keys, ref_values))
     }
 
+    if "`ref_column'" == "" & "`ref_group'" == "" {
+        qui jl: ref = nothing
+    }
+
     if `autoadjust' == 0 {
         qui jl: autoadjust = false
     }
