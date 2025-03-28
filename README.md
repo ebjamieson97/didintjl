@@ -17,3 +17,8 @@ net install undidjl, from("https://raw.githubusercontent.com/ebjamieson97/didint
 * **Julia**: Version > 1.11.1
 * **Stata**: Version 14.1 or later
 * **David Roodman’s Julia package for Stata**: [julia.ado](https://github.com/droodman/julia.ado)
+
+### Get Help
+```stata
+help didintjl
+```
