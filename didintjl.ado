@@ -54,14 +54,14 @@ program define didintjl
     qui tokenize "`treated_states'"
     while "`1'" != "" {
         global treated_states_to_julia "`1'"
-		qui jl: push!(covariates, "$treated_states_to_julia")
+		qui jl: push!(treated_states, "$treated_states_to_julia")
 		local counter = `counter' + 1
 		macro shift
     }
     qui tokenize "`treated_times'"
     while "`1'" != "" {
         global treated_times_to_julia "`1'"
-		qui jl: push!(covariates, "$treated_times_to_julia")
+		qui jl: push!(treated_times, "$treated_times_to_julia")
 		local counter = `counter' + 1
 		macro shift
     }
