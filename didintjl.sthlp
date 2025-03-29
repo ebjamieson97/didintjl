@@ -2,7 +2,7 @@
 {*------------------------------------*}
 {* didintjl                                           }
 {* written by Eric Jamieson                           }
-{* version 0.1.0 2025-03-27                           }
+{* version 0.2.0 2025-03-28                           }
 {*------------------------------------*}
 
 {help didintjl:didintjl}
