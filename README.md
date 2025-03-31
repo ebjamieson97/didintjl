@@ -4,11 +4,11 @@ This Stata package acts as a wrapper for the Julia package DiDInt.jl.
 undidjl allows for estimation of difference-in-differences with covariates that may vary by state & time, see https://arxiv.org/abs/2412.14447 for more details.
 
 ## Installation 
+didintjl will automatically download the DiDInt.jl package for Julia if it is not found to be downloaded already.
+
 ```stata
 net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/")
 ```
-didintjl may run slow the first time it is run if the DiDInt.jl package for Julia is not already downloaded. didintjl will automatically download the DiDInt.jl package for Julia if it is not found to be downloaded already.
-
 
 ### Update
 ```stata
