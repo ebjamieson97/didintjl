@@ -10,7 +10,7 @@ d KW: difference in differences
 d
 d
 d Requires: Stata 16 or later
-d Requires: Julia 
+d Requires: Julia
 d
 d Author: Eric Jamieson
 d Support: ericbrucejamieson@gmail.com

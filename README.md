@@ -26,8 +26,10 @@ net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didin
 help didintjl
 ```
 
-## Julia side errors
-### valid for DiDInt.jl version 0.2.1
+## Julia Side Errors
+### Valid for DiDInt.jl version 0.2.1
+
+Errors that happen in Julia can have their messages cut-off when displaying through the Stata outputs. Usually, only the first few characters of the Julia error message are visible in Stata. Below are all of the Julia error codes from *DiDInt.jl* and their associated messages.
 
 ```julia
 error("Er01: Please specify a date_format listed here: $possible_formats.")
