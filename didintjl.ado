@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.2.0 2025-03-028 */
+/*version 0.2.1 2025-04-01 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -161,17 +161,6 @@ program define didintjl
         di as error "verbose must be 0 (False) or 1 (True)"
         exit 5
     }
-	
-	if `stata_debug' == 0 {
-        qui jl: stata_debug = false
-    }
-    else if `stata_debug' == 1 {
-        qui jl: stata_debug = true
-    }
-    else {
-        di as error "stata_debug must be 0 (False) or 1 (True)"
-        exit 5
-    }
 
     qui jl: results = DiDInt.didint("$outcome", "$state", "$time", df, treated_states, treated_times, date_format = "$date_format", covariates = covariates, ccc = "$ccc", agg = "$agg", ref = ref, freq = freq, freq_multiplier = $freq_multiplier, autoadjust = autoadjust, nperm = $nperm, verbose = verbose)
     qui jl use results, clear
@@ -183,7 +172,8 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
-*0.2.0 - fixed 'freq' arg - function actually works now for common + staggered adoption, also removed 'stata_debug' arg, hopefully not needed anymore
+*0.2.1 - removed 'stata_debug' arg, hopefully not needed anymore
+*0.2.0 - fixed 'freq' arg - function actually works now for common + staggered adoption
 *0.1.2 - added 'stata_debug' arg and trim whitespce for tokenized args
 *0.1.1 - added 'agg' arg
 *0.1.0 - created function
