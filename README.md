@@ -26,6 +26,18 @@ net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didin
 help didintjl
 ```
 
+## Return Values
+
+```stata
+r(att) // for the aggregate att
+r(se) // for the standard error of the aggregate att
+r(p) // for the p-value from the two-sided t-test of the aggregate att
+r(jkse) // for the jackknife standard error of the aggregate att
+r(jkp) // for the p-value from the two-sided t-test of the aggregate att using the jackknife standard error
+r(rip) // for the p-value resulting from the randomization inference procedure
+matrix list restab // for the results table at the state/cohort/rt level
+```
+
 ## Julia Side Errors
 ### Valid for DiDInt.jl version 0.2.1
 
