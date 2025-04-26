@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.3.0 2025-04-05 */
+/*version 0.4.0 2025-04-26 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -12,7 +12,7 @@ program define didintjl, rclass
             date_format(string) /// 
             [covariates(string) ccc(string) agg(string) ref_column(string) ref_group(string) ///
             freq(string) freq_multiplier(int 1) autoadjust(int 0) ///
-            nperm(int 1000) verbose(int 1)]
+            nperm(int 1000) verbose(int 1) seed(int 0)]
 
 	// PART ONE: BASIC SETUP 
     qui cap which jl
@@ -20,6 +20,14 @@ program define didintjl, rclass
         di as error "The 'julia' package is required but not installed or not found in the system path. See https://github.com/droodman/julia.ado for more details."
         exit 3
     } 
+
+    // Check seed value 
+    if `seed' == 0 {
+        qui jl: seed = abs(round(randn(1)[1]*10000))
+    }
+    else {
+        qui jl: seed = `seed'
+    }
 
     // Check that DiDInt.jl for Julia is installed, update if updatejuliapackage == 1
     jl: using Pkg
@@ -163,8 +171,18 @@ program define didintjl, rclass
         exit 5
     }
 	
-	// PART TWO: RUN DiDInt.jl
-    qui jl: results = DiDInt.didint("$outcome", "$state", "$time", df, treated_states, treated_times, date_format = "$date_format", covariates = covariates, ccc = "$ccc", agg = "$agg", ref = ref, freq = freq, freq_multiplier = $freq_multiplier, autoadjust = autoadjust, nperm = $nperm, verbose = verbose)
+	// PART TWO: RUN DiDInt.jl and convert some columns to strings
+    qui jl: results = DiDInt.didint("$outcome", "$state", "$time", df, treated_states, treated_times, date_format = "$date_format", covariates = covariates, ccc = "$ccc", agg = "$agg", ref = ref, freq = freq, freq_multiplier = $freq_multiplier, autoadjust = autoadjust, nperm = $nperm, verbose = verbose, seed = seed)
+    qui jl: if "att_cohort" in DataFrames.names(results) ///
+                results.treatment_time = string.(results.treatment_time); ///
+            elseif "att_gt" in DataFrames.names(results) ///
+                results.r1 = string.(results.r1); ///
+                results.time = string.(results.time); ///
+                results.gvar = string.(results.gvar); ///
+            elseif "att_sgt" in DataFrames.names(results) ///
+                results.t = string.(results.t); ///
+                results.gvar = string.(results.gvar); ///
+            end
 
 	// PART THREE: PASS RESULTS TO STATA
 	tempname result_frame
@@ -184,23 +202,23 @@ program define didintjl, rclass
 	qui capture confirm variable `tmp_att_s'
 	if _rc == 0 & `condition_met' == 0 {
 		local condition_met 1
-		di as text "-------------------------------------------------------------------------------------------"
+		di as text "-----------------------------------------------------------------------------------------------------"
 		di as text "                                       DiDInt.jl Results                    "
-		di as text "-------------------------------------------------------------------------------------------"
-		di as text "State                     | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val |"
-		di as text "--------------------------|-----------------|--------|--------|------------|--------------|"
+		di as text "-----------------------------------------------------------------------------------------------------"
+		di as text "State                     | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
+		di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"  
 		
 		// Initialize a temporary matrix to store the numeric results
         tempname table_matrix
         local num_rows = _N
-        local num_cols = 5
+        local num_cols = 6
         matrix `table_matrix' = J(`num_rows', `num_cols', .)
 		local state_names ""
 		
 		forvalues i = 1/`=_N' {
-			di as text %-25s "`=`tmp_state'[`i']'" as text " |" as result %-16.7f `tmp_att_s'[`i'] as text " | " as result  %-7.3f `tmp_se_att_s'[`i'] as text "| " as result %-7.3f `tmp_pval_att_s'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_s'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_s'[`i'] as text "|"
+			di as text %-25s "`=`tmp_state'[`i']'" as text " |" as result %-16.7f `tmp_att_s'[`i'] as text " | " as result  %-7.3f `tmp_se_att_s'[`i'] as text "| " as result %-7.3f `tmp_pval_att_s'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_s'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_s'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_s'[`i'] as text "|"
     
-			di as text "--------------------------|-----------------|--------|--------|------------|--------------|"
+			di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 			
 			// Store the state name
             local state_name = `tmp_state'[`i']
@@ -212,9 +230,10 @@ program define didintjl, rclass
             matrix `table_matrix'[`i', 3] = `tmp_pval_att_s'[`i']
             matrix `table_matrix'[`i', 4] = `tmp_jknifese_att_s'[`i']
             matrix `table_matrix'[`i', 5] = `tmp_jknifepval_att_s'[`i']
+            matrix `table_matrix'[`i', 6] = `tmp_ri_pval_att_s'[`i']
 		}
 		// Set column names for the matrix
-        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval
+        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval
         
         // Set row names for the matrix using the state names
         matrix rownames `table_matrix' = `state_names'
@@ -223,7 +242,7 @@ program define didintjl, rclass
         return matrix restab = `table_matrix'
         
 		local linesize = c(linesize)
-		if `linesize' < 93 {
+		if `linesize' < 103 {
 			di as text "Results table may be squished, try expanding Stata results window."
 		}
 		di as text _n "Aggregation Method: State"
@@ -232,23 +251,23 @@ program define didintjl, rclass
     qui capture confirm variable `tmp_att_cohort'
 	if _rc == 0 & `condition_met' == 0 {
 		local condition_met 1
-		di as text "-------------------------------------------------------------------------------------------"
+		di as text "-----------------------------------------------------------------------------------------------------"
 		di as text "                                       DiDInt.jl Results                    "
-		di as text "-------------------------------------------------------------------------------------------"
-		di as text "Cohort                    | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val |"
-		di as text "--------------------------|-----------------|--------|--------|------------|--------------|"
+		di as text "-----------------------------------------------------------------------------------------------------"
+		di as text "Cohort                    | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
+		di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"  
 		
 		// Initialize a temporary matrix to store the numeric results
         tempname table_matrix
         local num_rows = _N
-        local num_cols = 5
+        local num_cols = 6
         matrix `table_matrix' = J(`num_rows', `num_cols', .)
 		local cohort_names ""
 		
 		forvalues i = 1/`=_N' {
-			di as text %-25s "`=`tmp_treatment_time'[`i']'" as text " |" as result %-16.7f `tmp_att_cohort'[`i'] as text " | " as result  %-7.3f `tmp_se_att_cohort'[`i'] as text "| " as result %-7.3f `tmp_pval_att_cohort'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_cohort'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_cohort'[`i'] as text "|"
+			di as text %-25s "`=`tmp_treatment_time'[`i']'" as text " |" as result %-16.7f `tmp_att_cohort'[`i'] as text " | " as result  %-7.3f `tmp_se_att_cohort'[`i'] as text "| " as result %-7.3f `tmp_pval_att_cohort'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_cohort'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_cohort'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_cohort'[`i'] as text "|"
     
-			di as text "--------------------------|-----------------|--------|--------|------------|--------------|"
+			di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 			
 			// Store the cohort name
             local cohort_name = `tmp_treatment_time'[`i']
@@ -260,9 +279,10 @@ program define didintjl, rclass
             matrix `table_matrix'[`i', 3] = `tmp_pval_att_cohort'[`i']
             matrix `table_matrix'[`i', 4] = `tmp_jknifese_att_cohort'[`i']
             matrix `table_matrix'[`i', 5] = `tmp_jknifepval_att_cohort'[`i']
+            matrix `table_matrix'[`i', 6] = `tmp_ri_pval_att_cohort'[`i']
 		}
 		// Set column names for the matrix
-        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval
+        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval
         
         // Set row names for the matrix using the state names
         matrix rownames `table_matrix' = `cohort_names'
@@ -271,60 +291,115 @@ program define didintjl, rclass
         return matrix restab = `table_matrix'
         
 		local linesize = c(linesize)
-		if `linesize' < 93 {
+		if `linesize' < 103 {
 			di as text "Results table may be squished, try expanding Stata results window."
 		}
 		di as text _n "Aggregation Method: Cohort"
 	}
 
-    qui capture confirm variable `tmp_time'
+    qui capture confirm variable `tmp_att_sgt'
 	if _rc == 0 & `condition_met' == 0 {
 		local condition_met 1
-		di as text "-------------------------------------------------------------------------------------------"
+		di as text "-----------------------------------------------------------------------------------------------------"
 		di as text "                                       DiDInt.jl Results                    "
-		di as text "-------------------------------------------------------------------------------------------"
-		di as text "r1;t                      | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val |"
-		di as text "--------------------------|-----------------|--------|--------|------------|--------------|"
+		di as text "-----------------------------------------------------------------------------------------------------"
+		di as text "s;g;t                       | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
+		di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 		
 		// Initialize a temporary matrix to store the numeric results
         tempname table_matrix
         local num_rows = _N
-        local num_cols = 5
+        local num_cols = 6
         matrix `table_matrix' = J(`num_rows', `num_cols', .)
 		local state_names ""
 
-        tempvar rt
-        qui gen `rt' = `tmp_r1' + ";" + `tmp_time'
+        tempvar sgt
+        qui gen `sgt' = `tmp_state' + ";" + `tmp_gvar' + ";" + `tmp_t'
 
         // Create the gt varialbe in julia
 		
 		forvalues i = 1/`=_N' {
-			di as text %-25s "`=`rt'[`i']'" as text " |" as result %-16.7f `tmp_att_rt'[`i'] as text " | " as result  %-7.3f `tmp_se_att_rt'[`i'] as text "| " as result %-7.3f `tmp_pval_att_rt'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_rt'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_rt'[`i'] as text "|"
+			di as text %-25s "`=`sgt'[`i']'" as text " |" as result %-16.7f `tmp_att_sgt'[`i'] as text " | " as result  %-7.3f `tmp_se_att_sgt'[`i'] as text "| " as result %-7.3f `tmp_pval_att_sgt'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_sgt'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_sgt'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_sgt'[`i'] as text "|"
     
-			di as text "--------------------------|-----------------|--------|--------|------------|--------------|"
+			di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 			
-			// Store the rt
-            local rt_name = `rt'[`i']
-            local rt_names `rt_names' `rt_name'
+			// Store the gt
+            local sgt_name = `sgt'[`i']
+            local sgt_names `sgt_names' `sgt_name'
             
             // Fill the matrix with numeric values
-            matrix `table_matrix'[`i', 1] = `tmp_att_rt'[`i']
-            matrix `table_matrix'[`i', 2] = `tmp_se_att_rt'[`i']
-            matrix `table_matrix'[`i', 3] = `tmp_pval_att_rt'[`i']
-            matrix `table_matrix'[`i', 4] = `tmp_jknifese_att_rt'[`i']
-            matrix `table_matrix'[`i', 5] = `tmp_jknifepval_att_rt'[`i']
+            matrix `table_matrix'[`i', 1] = `tmp_att_sgt'[`i']
+            matrix `table_matrix'[`i', 2] = `tmp_se_att_sgt'[`i']
+            matrix `table_matrix'[`i', 3] = `tmp_pval_att_sgt'[`i']
+            matrix `table_matrix'[`i', 4] = `tmp_jknifese_att_sgt'[`i']
+            matrix `table_matrix'[`i', 5] = `tmp_jknifepval_att_sgt'[`i']
+            matrix `table_matrix'[`i', 6] = `tmp_ri_pval_att_sgt'[`i']
 		}
 		// Set column names for the matrix
-        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval
+        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval
         
         // Set row names for the matrix using the state names
-        matrix rownames `table_matrix' = `rt_names'
+        matrix rownames `table_matrix' = `sgt_names'
         
         // Store the matrix in r()
         return matrix restab = `table_matrix'
         
 		local linesize = c(linesize)
-		if `linesize' < 93 {
+		if `linesize' < 103 {
+			di as text "Results table may be squished, try expanding Stata results window."
+		}
+		di as text _n "Aggregation Method: sgt"
+	}
+
+    qui capture confirm variable `tmp_att_gt'
+	if _rc == 0 & `condition_met' == 0 {
+		local condition_met 1
+		di as text "-----------------------------------------------------------------------------------------------------"
+		di as text "                                       DiDInt.jl Results                    "
+		di as text "-----------------------------------------------------------------------------------------------------"
+		di as text "g;t                       | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
+		di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
+		
+		// Initialize a temporary matrix to store the numeric results
+        tempname table_matrix
+        local num_rows = _N
+        local num_cols = 6
+        matrix `table_matrix' = J(`num_rows', `num_cols', .)
+		local state_names ""
+
+        tempvar gt
+        qui gen `gt' = `tmp_gvar' + ";" + `tmp_time'
+
+        // Create the gt varialbe in julia
+		
+		forvalues i = 1/`=_N' {
+			di as text %-25s "`=`gt'[`i']'" as text " |" as result %-16.7f `tmp_att_gt'[`i'] as text " | " as result  %-7.3f `tmp_se_att_gt'[`i'] as text "| " as result %-7.3f `tmp_pval_att_gt'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_gt'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_gt'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_gt'[`i'] as text "|"
+    
+			di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
+			
+			// Store the gt
+            local gt_name = `gt'[`i']
+            local gt_names `gt_names' `gt_name'
+            
+            // Fill the matrix with numeric values
+            matrix `table_matrix'[`i', 1] = `tmp_att_gt'[`i']
+            matrix `table_matrix'[`i', 2] = `tmp_se_att_gt'[`i']
+            matrix `table_matrix'[`i', 3] = `tmp_pval_att_gt'[`i']
+            matrix `table_matrix'[`i', 4] = `tmp_jknifese_att_gt'[`i']
+            matrix `table_matrix'[`i', 5] = `tmp_jknifepval_att_gt'[`i']
+            matrix `table_matrix'[`i', 6] = `tmp_ri_pval_att_gt'[`i']
+		}
+		// Set column names for the matrix
+        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval
+        
+        // Set row names for the matrix using the state names
+        matrix rownames `table_matrix' = `gt_names'
+        
+        // Store the matrix in r()
+        return matrix restab = `table_matrix'
+        
+		local linesize = c(linesize)
+		if `linesize' < 103 {
 			di as text "Results table may be squished, try expanding Stata results window."
 		}
 		di as text _n "Aggregation Method: Simple"
@@ -359,6 +434,7 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.4.0 - added sgt weighting option, RI_pvals for sub-aggregate level, and seed arg
 *0.3.0 - changed to rclass and added displays for outputs
 *0.2.1 - removed 'stata_debug' arg, hopefully not needed anymore
 *0.2.0 - fixed 'freq' arg - function actually works now for common + staggered adoption
