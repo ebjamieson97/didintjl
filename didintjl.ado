@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.4.0 2025-04-26 */
+/*version 0.4.1 2025-05-18 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -440,7 +440,8 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
-*0.4.0 - added sgt weighting option, RI_pvals for sub-aggregate level, and seed arg
+*0.4.1 - added weighting arg
+*0.4.0 - added sgt agg option, RI_pvals for sub-aggregate level, and seed arg
 *0.3.0 - changed to rclass and added displays for outputs
 *0.2.1 - removed 'stata_debug' arg, hopefully not needed anymore
 *0.2.0 - fixed 'freq' arg - function actually works now for common + staggered adoption
