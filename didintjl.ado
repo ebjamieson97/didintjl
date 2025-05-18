@@ -10,7 +10,7 @@ program define didintjl, rclass
     syntax, outcome(string) state(string) time(string) ///
             treated_states(string) treatment_times(string) ///
             date_format(string) /// 
-            [covariates(string) ccc(string) agg(string) ref_column(string) ref_group(string) ///
+            [covariates(string) ccc(string) agg(string) weighting(string) ref_column(string) ref_group(string) ///
             freq(string) freq_multiplier(int 1) autoadjust(int 0) ///
             nperm(int 1000) verbose(int 1) seed(int 0)]
 
@@ -108,6 +108,13 @@ program define didintjl, rclass
         global agg = "`agg'"
     }
 
+    if "`weighting'" == "" {
+        global weighting = "att"
+    } 
+    else {
+        global weighting = "`weighting'"
+    }
+ 
     // Parse ref_column tokens with trimming
     if "`ref_column'" != "" {
         qui jl: ref_keys = String[]
@@ -172,7 +179,7 @@ program define didintjl, rclass
     }
 	
 	// PART TWO: RUN DiDInt.jl and convert some columns to strings
-    qui jl: results = DiDInt.didint("$outcome", "$state", "$time", df, treated_states, treated_times, date_format = "$date_format", covariates = covariates, ccc = "$ccc", agg = "$agg", ref = ref, freq = freq, freq_multiplier = $freq_multiplier, autoadjust = autoadjust, nperm = $nperm, verbose = verbose, seed = seed)
+    qui jl: results = DiDInt.didint("$outcome", "$state", "$time", df, treated_states, treated_times, date_format = "$date_format", covariates = covariates, ccc = "$ccc", agg = "$agg", weighting = "$weighting", ref = ref, freq = freq, freq_multiplier = $freq_multiplier, autoadjust = autoadjust, nperm = $nperm, verbose = verbose, seed = seed)
     qui jl: if "att_cohort" in DataFrames.names(results) ///
                 results.treatment_time = string.(results.treatment_time); ///
             elseif "att_gt" in DataFrames.names(results) ///
@@ -365,7 +372,6 @@ program define didintjl, rclass
         local num_rows = _N
         local num_cols = 6
         matrix `table_matrix' = J(`num_rows', `num_cols', .)
-		local state_names ""
 
         tempvar gt
         qui gen `gt' = `tmp_gvar' + ";" + `tmp_time'
