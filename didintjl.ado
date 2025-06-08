@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.4.1 2025-05-18 */
+/*version 0.5.0 2025-06-08 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -11,8 +11,8 @@ program define didintjl, rclass
             treated_states(string) treatment_times(string) ///
             date_format(string) /// 
             [covariates(string) ccc(string) agg(string) weighting(string) ref_column(string) ref_group(string) ///
-            freq(string) freq_multiplier(int 1) autoadjust(int 0) ///
-            nperm(int 1000) verbose(int 1) seed(int 0)]
+            freq(string) freq_multiplier(int 1) start_date(string) end_date(string) ///
+            nperm(int 1000) verbose(int 1) seed(int 0) use_pre_controls(int 1)]
 
 	// PART ONE: BASIC SETUP 
     qui cap which jl
@@ -27,6 +27,18 @@ program define didintjl, rclass
     }
     else {
         qui jl: seed = `seed'
+    }
+
+    // Check use_pre_controls arg
+    if `use_pre_controls' == 1 {
+        qui jl: use_pre_controls = true
+    }
+    else if `use_pre_controls' == 0 {
+        qui jl: use_pre_controls = false
+    }
+    else {
+        di as error "use_pre_controls must be 0 (False) or 1 (True) (Default)"
+        exit 43
     }
 
     // Check that DiDInt.jl for Julia is installed, update if updatejuliapackage == 1
@@ -53,6 +65,21 @@ program define didintjl, rclass
     else {
         global freq = "`freq'"
         qui jl: freq = "$freq"
+    }
+
+    if "`start_date'" == "" {
+        qui jl: start_date = nothing
+    }
+    else {
+        global start_date = "`start_date'"
+        qui jl: start_date = "$start_date"
+    }
+    if "`end_date'" == "" {
+        qui jl: start_date = nothing
+    }
+    else {
+        global end_date = "`end_date'"
+        qui jl: end_date = "$end_date"
     }
 
     // Parse treated_states and treatment_times
@@ -102,14 +129,14 @@ program define didintjl, rclass
     }
     
     if "`agg'" == "" {
-        global agg = "state"
+        global agg = "cohort"
     } 
     else {
         global agg = "`agg'"
     }
 
     if "`weighting'" == "" {
-        global weighting = "att"
+        global weighting = "both"
     } 
     else {
         global weighting = "`weighting'"
@@ -156,17 +183,6 @@ program define didintjl, rclass
         qui jl: ref = nothing
     }
 
-    if `autoadjust' == 0 {
-        qui jl: autoadjust = false
-    }
-    else if `autoadjust' == 1 {
-        qui jl: autoadjust = true
-    }
-    else {
-        di as error "autoadjust must be 0 (False) or 1 (True)"
-        exit 4
-    }
-
     if `verbose' == 0 {
         qui jl: verbose = false
     }
@@ -179,7 +195,7 @@ program define didintjl, rclass
     }
 	
 	// PART TWO: RUN DiDInt.jl and convert some columns to strings
-    qui jl: results = DiDInt.didint("$outcome", "$state", "$time", df, treated_states, treated_times, date_format = "$date_format", covariates = covariates, ccc = "$ccc", agg = "$agg", weighting = "$weighting", ref = ref, freq = freq, freq_multiplier = $freq_multiplier, autoadjust = autoadjust, nperm = $nperm, verbose = verbose, seed = seed)
+    qui jl: results = DiDInt.didint("$outcome", "$state", "$time", df, treated_states, treated_times, date_format = "$date_format", covariates = covariates, ccc = "$ccc", agg = "$agg", weighting = "$weighting", ref = ref, freq = freq, freq_multiplier = $freq_multiplier, start_date = start_date, end_date = end_date, nperm = $nperm, verbose = verbose, seed = seed, use_pre_controls = use_pre_controls)
     qui jl: if "att_cohort" in DataFrames.names(results) ///
                 results.treatment_time = string.(results.treatment_time); ///
             elseif "att_gt" in DataFrames.names(results) ///
@@ -189,6 +205,8 @@ program define didintjl, rclass
             elseif "att_sgt" in DataFrames.names(results) ///
                 results.t = string.(results.t); ///
                 results.gvar = string.(results.gvar); ///
+            elseif "att_t" in DataFrames.names(results) ///
+                results.periods_post_treat = string.(results.periods_post_treat); ///
             end
 
 	// PART THREE: PASS RESULTS TO STATA
@@ -218,7 +236,7 @@ program define didintjl, rclass
 		// Initialize a temporary matrix to store the numeric results
         tempname table_matrix
         local num_rows = _N
-        local num_cols = 6
+        local num_cols = 7
         matrix `table_matrix' = J(`num_rows', `num_cols', .)
 		local state_names ""
 		
@@ -238,9 +256,10 @@ program define didintjl, rclass
             matrix `table_matrix'[`i', 4] = `tmp_jknifese_att_s'[`i']
             matrix `table_matrix'[`i', 5] = `tmp_jknifepval_att_s'[`i']
             matrix `table_matrix'[`i', 6] = `tmp_ri_pval_att_s'[`i']
+            matrix `table_matrix'[`i', 7] = `tmp_weights'[`i']
 		}
 		// Set column names for the matrix
-        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval
+        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval W
         
         // Set row names for the matrix using the state names
         matrix rownames `table_matrix' = `state_names'
@@ -267,7 +286,7 @@ program define didintjl, rclass
 		// Initialize a temporary matrix to store the numeric results
         tempname table_matrix
         local num_rows = _N
-        local num_cols = 6
+        local num_cols = 7
         matrix `table_matrix' = J(`num_rows', `num_cols', .)
 		local cohort_names ""
 		
@@ -287,9 +306,10 @@ program define didintjl, rclass
             matrix `table_matrix'[`i', 4] = `tmp_jknifese_att_cohort'[`i']
             matrix `table_matrix'[`i', 5] = `tmp_jknifepval_att_cohort'[`i']
             matrix `table_matrix'[`i', 6] = `tmp_ri_pval_att_cohort'[`i']
+            matrix `table_matrix'[`i', 7] = `tmp_weights'[`i']
 		}
 		// Set column names for the matrix
-        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval
+        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval W
         
         // Set row names for the matrix using the state names
         matrix rownames `table_matrix' = `cohort_names'
@@ -316,7 +336,7 @@ program define didintjl, rclass
 		// Initialize a temporary matrix to store the numeric results
         tempname table_matrix
         local num_rows = _N
-        local num_cols = 6
+        local num_cols = 7
         matrix `table_matrix' = J(`num_rows', `num_cols', .)
 		local state_names ""
 
@@ -341,9 +361,10 @@ program define didintjl, rclass
             matrix `table_matrix'[`i', 4] = `tmp_jknifese_att_sgt'[`i']
             matrix `table_matrix'[`i', 5] = `tmp_jknifepval_att_sgt'[`i']
             matrix `table_matrix'[`i', 6] = `tmp_ri_pval_att_sgt'[`i']
+            matrix `table_matrix'[`i', 7] = `tmp_weights'[`i']
 		}
 		// Set column names for the matrix
-        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval
+        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval W
         
         // Set row names for the matrix using the state names
         matrix rownames `table_matrix' = `sgt_names'
@@ -370,7 +391,7 @@ program define didintjl, rclass
 		// Initialize a temporary matrix to store the numeric results
         tempname table_matrix
         local num_rows = _N
-        local num_cols = 6
+        local num_cols = 7
         matrix `table_matrix' = J(`num_rows', `num_cols', .)
 
         tempvar gt
@@ -394,9 +415,10 @@ program define didintjl, rclass
             matrix `table_matrix'[`i', 4] = `tmp_jknifese_att_gt'[`i']
             matrix `table_matrix'[`i', 5] = `tmp_jknifepval_att_gt'[`i']
             matrix `table_matrix'[`i', 6] = `tmp_ri_pval_att_gt'[`i']
+            matrix `table_matrix'[`i', 7] = `tmp_weights'[`i']
 		}
 		// Set column names for the matrix
-        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval
+        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval W
         
         // Set row names for the matrix using the state names
         matrix rownames `table_matrix' = `gt_names'
@@ -410,8 +432,58 @@ program define didintjl, rclass
 		}
 		di as text _n "Aggregation Method: Simple"
 	}
-	
 
+    qui capture confirm variable `tmp_att_t'
+	if _rc == 0 & `condition_met' == 0 {
+		local condition_met 1
+		di as text "-----------------------------------------------------------------------------------------------------"
+		di as text "                                       DiDInt.jl Results                    "
+		di as text "-----------------------------------------------------------------------------------------------------"
+		di as text "Periods Since Treatment   | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
+		di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"  
+		
+		// Initialize a temporary matrix to store the numeric results
+        tempname table_matrix
+        local num_rows = _N
+        local num_cols = 7
+        matrix `table_matrix' = J(`num_rows', `num_cols', .)
+		local time_names ""
+		
+		forvalues i = 1/`=_N' {
+			di as text %-25s "`=`tmp_periods_post_treat'[`i']'" as text " |" as result %-16.7f `tmp_att_t'[`i'] as text " | " as result  %-7.3f `tmp_se_att_t'[`i'] as text "| " as result %-7.3f `tmp_pval_att_t'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_t'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_t'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_t'[`i'] as text "|"
+    
+			di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
+			
+			// Store the state name
+            local time_name = `tmp_periods_post_treat'[`i']
+            local time_names `time_names' `time_name'
+            
+            // Fill the matrix with numeric values
+            matrix `table_matrix'[`i', 1] = `tmp_att_t'[`i']
+            matrix `table_matrix'[`i', 2] = `tmp_se_att_t'[`i']
+            matrix `table_matrix'[`i', 3] = `tmp_pval_att_t'[`i']
+            matrix `table_matrix'[`i', 4] = `tmp_jknifese_att_t'[`i']
+            matrix `table_matrix'[`i', 5] = `tmp_jknifepval_att_t'[`i']
+            matrix `table_matrix'[`i', 6] = `tmp_ri_pval_att_t'[`i']
+            matrix `table_matrix'[`i', 7] = `tmp_weights'[`i']
+		}
+		// Set column names for the matrix
+        matrix colnames `table_matrix' = ATT SE pval JKNIFE_SE JKNIFE_pval RI_pval W
+        
+        // Set row names for the matrix using the state names
+        matrix rownames `table_matrix' = `state_names'
+        
+        // Store the matrix in r()
+        return matrix restab = `table_matrix'
+        
+		local linesize = c(linesize)
+		if `linesize' < 103 {
+			di as text "Results table may be squished, try expanding Stata results window."
+		}
+		di as text _n "Aggregation Method: Periods Since Treatment"
+	}
+	
+	
        // Display aggregate results
        di as text _n "Aggregate Results:"
        di as text "Aggregate ATT: " as result `tmp_agg_att'[1]
@@ -433,13 +505,14 @@ program define didintjl, rclass
 	qui frame change default
     qui frame drop `result_frame'
 	
-	qui macro drop outcome state time date_format nperm freq_multiplier treated_states_to_julia treated_times_to_julia freq covariate_to_julia ref_column_to_julia ref_group_to_julia
+	qui macro drop outcome state time date_format nperm freq_multiplier treated_states_to_julia treated_times_to_julia freq covariate_to_julia ref_column_to_julia ref_group_to_julia start_date end_date
 
 end
 
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.5.0 - added start_date and end_date args and removed autoadjust to conincide with new version of DiDInt.jl package
 *0.4.1 - added weighting arg
 *0.4.0 - added sgt agg option, RI_pvals for sub-aggregate level, and seed arg
 *0.3.0 - changed to rclass and added displays for outputs
