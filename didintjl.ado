@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.5.0 2025-06-08 */
+/*version 0.5.1 2025-06-09 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -12,7 +12,7 @@ program define didintjl, rclass
             date_format(string) /// 
             [covariates(string) ccc(string) agg(string) weighting(string) ref_column(string) ref_group(string) ///
             freq(string) freq_multiplier(int 1) start_date(string) end_date(string) ///
-            nperm(int 1000) verbose(int 1) seed(int 0) use_pre_controls(int 1)]
+            nperm(int 1000) verbose(int 1) seed(int 0) use_pre_controls(int 0)]
 
 	// PART ONE: BASIC SETUP 
     qui cap which jl
@@ -512,6 +512,7 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.5.1 - changed use_pre_controls default to false
 *0.5.0 - added start_date and end_date args and removed autoadjust to conincide with new version of DiDInt.jl package
 *0.4.1 - added weighting arg
 *0.4.0 - added sgt agg option, RI_pvals for sub-aggregate level, and seed arg
