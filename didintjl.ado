@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.5.1 2025-06-09 */
+/*version 0.5.2 2025-07-07 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -75,7 +75,7 @@ program define didintjl, rclass
         qui jl: start_date = "$start_date"
     }
     if "`end_date'" == "" {
-        qui jl: start_date = nothing
+        qui jl: end_date = nothing
     }
     else {
         global end_date = "`end_date'"
@@ -196,6 +196,7 @@ program define didintjl, rclass
 	
 	// PART TWO: RUN DiDInt.jl and convert some columns to strings
     qui jl: results = DiDInt.didint("$outcome", "$state", "$time", df, treated_states, treated_times, date_format = "$date_format", covariates = covariates, ccc = "$ccc", agg = "$agg", weighting = "$weighting", ref = ref, freq = freq, freq_multiplier = $freq_multiplier, start_date = start_date, end_date = end_date, nperm = $nperm, verbose = verbose, seed = seed, use_pre_controls = use_pre_controls)
+	
     qui jl: if "att_cohort" in DataFrames.names(results) ///
                 results.treatment_time = string.(results.treatment_time); ///
             elseif "att_gt" in DataFrames.names(results) ///
@@ -512,6 +513,7 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.5.2 - fixed assignment issue with start_date / end_date
 *0.5.1 - changed use_pre_controls default to false
 *0.5.0 - added start_date and end_date args and removed autoadjust to conincide with new version of DiDInt.jl package
 *0.4.1 - added weighting arg
