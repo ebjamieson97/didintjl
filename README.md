@@ -45,7 +45,10 @@ matrix list r(restab) // for the results table at the sub-aggregate ATT level
 
 ```stata
 . use "MeritExampleDataDiDIntjl.dta", clear
-. didintjl, outcome("coll") state("state") time("year") treated_states("34 57 58 59 61 64 71 72 85 88") treatment_times("2000 1998 1993 1997 1999 1996 1991 1998 1997 2000") date_format("yyyy") covariates("asian male black") ccc("int") 
+. didintjl, outcome("coll") state("state") time("year") ///
+ treated_states("34 57 58 59 61 64 71 72 85 88") ///
+ treatment_times("2000 1998 1993 1997 1999 1996 1991 1998 1997 2000") ///
+ date_format("yyyy") covariates("asian male black") ccc("int") 
 
 
 -----------------------------------------------------------------------------------------------------
