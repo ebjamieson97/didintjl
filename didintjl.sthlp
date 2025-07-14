@@ -2,7 +2,7 @@
 {*------------------------------------*}
 {* didintjl                                           }
 {* written by Eric Jamieson                           }
-{* version 0.2.0 2025-03-28                           }
+{* version 0.5.2 2025-07-13                           }
 {*------------------------------------*}
 
 {help didintjl:didintjl}
@@ -12,7 +12,7 @@
 
 {pstd}
 didintjl - Stata wrapper for the DiDInt.jl Julia package.  
-Estimates the average treatment effect on the treated (ATT) while accounting for covariates that may vary by state, time, or both.  
+Estimates the average treatment effect on the treated (ATT) while accounting for covariates that may vary by state, time, or both. That is, estimates ATT while accounting for different violations of the common causal covariates assumption.
 {p_end}
 
 {title:Command Description}
@@ -29,9 +29,9 @@ It then calls the Julia function didint() with the provided options and returns 
 {cmd:didintjl} outcome(string) state(string) time(string) ///
     treated_states(string) treatment_times(string) ///
     date_format(string) ///
-    [ covariates(string) ccc(string) ref_column(string) ref_group(string) ///
-    freq(string) freq_multiplier(int 1) autoadjust(int 0) ///
-    nperm(int 1000) verbose(int 1) ]
+    [covariates(string) ccc(string) ref_column(string) ref_group(string) ///
+    freq(string) freq_multiplier(int 1) start_date(string) end_date(string)///
+    nperm(int 1000) verbose(int 1) seed(int 0) use_pre_controls(int 0)]
 {p_end}
 
 {title:Parameters}
@@ -75,27 +75,31 @@ It then calls the Julia function didint() with the provided options and returns 
 - {bf:freq_multiplier} (int, optional, default 1)  
  Multiplier for the freq argument (e.g., 2 for a two-year period).
 
-- {bf:autoadjust} (int, optional, default 0)  
- Set to 1 to automatically determine the period length, 0 otherwise.
+- {bf:start_date} (string, optional)  
+Can be set to indicate the start of the window for the analysis.
+
+- {bf:end_date} (string, optional)  
+Can be set to indicate the end of the window for the analysis.
 
 - {bf:nperm} (int, optional, default 1000)  
  Number of unique permutations for randomization inference.
 
 - {bf:verbose} (int, optional, default 1)  
- Set to 1 for progress output, 0 for quiet operation.
+ Set to 1 for progress output, 0 for quiet operation. Note this argument is deprecated and will have no effect.
 {p_end}
 
 {title:Examples}
 
 {phang2}
-For example, if you have a dataset with outcome variable "y", state variable "state", and date variable "date_str", and you wish to specify treated states and treatment times, you might call:
+For example, using the MeritExampleDataDiDIntjl.dta :
 {p_end}
 
 {pstd}
-  didintjl outcome("y") state("state") time("date_str") ///
-    treated_states("StateA StateB") treatment_times("1995-01-01 1997-01-01") ///
-    date_format("yyyy-mm-dd") covariates("cov1 cov2") ccc("int") ref_column("group") ref_group("baseline") ///
-    freq("year") freq_multiplier(1) autoadjust(0) nperm(1000) verbose(1)
+* CCC : two-way intersection
+didintjl, outcome("coll") state("state") time("year") ///
+ treated_states("34 57 58 59 61 64 71 72 85 88") ///
+  treatment_times("2000 1998 1993 1997 1999 1996 1991 1998 1997 2000") ///
+   date_format("yyyy") covariates("asian male black") ccc("int") 
 {p_end}
 
 {title:Author}
