@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.5.2 2025-07-07 */
+/*version 0.5.3 2025-09-22 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -198,16 +198,15 @@ program define didintjl, rclass
     qui jl: results = DiDInt.didint("$outcome", "$state", "$time", df, treated_states, treated_times, date_format = "$date_format", covariates = covariates, ccc = "$ccc", agg = "$agg", weighting = "$weighting", ref = ref, freq = freq, freq_multiplier = $freq_multiplier, start_date = start_date, end_date = end_date, nperm = $nperm, verbose = verbose, seed = seed, use_pre_controls = use_pre_controls)
 	
     qui jl: if "att_cohort" in DataFrames.names(results) ///
-                results.treatment_time = string.(results.treatment_time); ///
+                results.labels = string.(results.treatment_time); ///
+            elseif "att_s" in DataFrames.names(results) ///
+                results.labels = string.(results.state); ///
             elseif "att_gt" in DataFrames.names(results) ///
-                results.r1 = string.(results.r1); ///
-                results.time = string.(results.time); ///
-                results.gvar = string.(results.gvar); ///
+                results.labels = string.(results.gvar, ";", results.time); ///
             elseif "att_sgt" in DataFrames.names(results) ///
-                results.t = string.(results.t); ///
-                results.gvar = string.(results.gvar); ///
+                results.labels = string.(results.state, ";", results.gvar, ";", results.t); ///
             elseif "att_t" in DataFrames.names(results) ///
-                results.periods_post_treat = string.(results.periods_post_treat); ///
+                results.labels = string.(results.periods_post_treat); ///
             end
 
 	// PART THREE: PASS RESULTS TO STATA
@@ -216,6 +215,18 @@ program define didintjl, rclass
     qui frame create `result_frame'
     qui frame change `result_frame'
     qui jl use results
+
+    qui cap confirm variable labels
+	if !_rc {
+		qui jl: st_local("rowlabels", join(string.(results.labels), " "))
+		qui tostring labels, replace
+		local counter = 1
+		foreach rowlabel in `rowlabels' {
+			qui replace labels = "`rowlabel'" in `counter'
+			local counter = `counter' + 1
+		}
+	}
+
     qui ds 
     qui local result_vars `r(varlist)'
     foreach var in `result_vars' {
@@ -223,6 +234,10 @@ program define didintjl, rclass
         qui gen `tmp_`var'' = `var'
         qui drop `var'
     }
+
+
+
+
 	local condition_met 0
 
 	qui capture confirm variable `tmp_att_s'
@@ -242,12 +257,12 @@ program define didintjl, rclass
 		local state_names ""
 		
 		forvalues i = 1/`=_N' {
-			di as text %-25s "`=`tmp_state'[`i']'" as text " |" as result %-16.7f `tmp_att_s'[`i'] as text " | " as result  %-7.3f `tmp_se_att_s'[`i'] as text "| " as result %-7.3f `tmp_pval_att_s'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_s'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_s'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_s'[`i'] as text "|"
+			di as text %-25s "`=`tmp_labels'[`i']'" as text " |" as result %-16.7f `tmp_att_s'[`i'] as text " | " as result  %-7.3f `tmp_se_att_s'[`i'] as text "| " as result %-7.3f `tmp_pval_att_s'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_s'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_s'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_s'[`i'] as text "|"
     
 			di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 			
 			// Store the state name
-            local state_name = `tmp_state'[`i']
+            local state_name = `tmp_labels'[`i']
             local state_names `state_names' `state_name'
             
             // Fill the matrix with numeric values
@@ -292,12 +307,12 @@ program define didintjl, rclass
 		local cohort_names ""
 		
 		forvalues i = 1/`=_N' {
-			di as text %-25s "`=`tmp_treatment_time'[`i']'" as text " |" as result %-16.7f `tmp_att_cohort'[`i'] as text " | " as result  %-7.3f `tmp_se_att_cohort'[`i'] as text "| " as result %-7.3f `tmp_pval_att_cohort'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_cohort'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_cohort'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_cohort'[`i'] as text "|"
+			di as text %-25s "`=`tmp_labels'[`i']'" as text " |" as result %-16.7f `tmp_att_cohort'[`i'] as text " | " as result  %-7.3f `tmp_se_att_cohort'[`i'] as text "| " as result %-7.3f `tmp_pval_att_cohort'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_cohort'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_cohort'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_cohort'[`i'] as text "|"
     
 			di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 			
 			// Store the cohort name
-            local cohort_name = `tmp_treatment_time'[`i']
+            local cohort_name = `tmp_labels'[`i']
             local cohort_names `cohort_names' `cohort_name'
             
             // Fill the matrix with numeric values
@@ -341,18 +356,15 @@ program define didintjl, rclass
         matrix `table_matrix' = J(`num_rows', `num_cols', .)
 		local state_names ""
 
-        tempvar sgt
-        qui gen `sgt' = `tmp_state' + ";" + `tmp_gvar' + ";" + `tmp_t'
-
         // Create the gt varialbe in julia
 		
 		forvalues i = 1/`=_N' {
-			di as text %-25s "`=`sgt'[`i']'" as text " |" as result %-16.7f `tmp_att_sgt'[`i'] as text " | " as result  %-7.3f `tmp_se_att_sgt'[`i'] as text "| " as result %-7.3f `tmp_pval_att_sgt'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_sgt'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_sgt'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_sgt'[`i'] as text "|"
+			di as text %-25s "`=`tmp_labels'[`i']'" as text " |" as result %-16.7f `tmp_att_sgt'[`i'] as text " | " as result  %-7.3f `tmp_se_att_sgt'[`i'] as text "| " as result %-7.3f `tmp_pval_att_sgt'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_sgt'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_sgt'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_sgt'[`i'] as text "|"
     
 			di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 			
 			// Store the gt
-            local sgt_name = `sgt'[`i']
+            local sgt_name = `tmp_labels'[`i']
             local sgt_names `sgt_names' `sgt_name'
             
             // Fill the matrix with numeric values
@@ -395,18 +407,15 @@ program define didintjl, rclass
         local num_cols = 7
         matrix `table_matrix' = J(`num_rows', `num_cols', .)
 
-        tempvar gt
-        qui gen `gt' = `tmp_gvar' + ";" + `tmp_time'
-
         // Create the gt varialbe in julia
 		
 		forvalues i = 1/`=_N' {
-			di as text %-25s "`=`gt'[`i']'" as text " |" as result %-16.7f `tmp_att_gt'[`i'] as text " | " as result  %-7.3f `tmp_se_att_gt'[`i'] as text "| " as result %-7.3f `tmp_pval_att_gt'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_gt'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_gt'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_gt'[`i'] as text "|"
+			di as text %-25s "`=`tmp_labels'[`i']'" as text " |" as result %-16.7f `tmp_att_gt'[`i'] as text " | " as result  %-7.3f `tmp_se_att_gt'[`i'] as text "| " as result %-7.3f `tmp_pval_att_gt'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_gt'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_gt'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_gt'[`i'] as text "|"
     
 			di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 			
 			// Store the gt
-            local gt_name = `gt'[`i']
+            local gt_name = `tmp_labels'[`i']
             local gt_names `gt_names' `gt_name'
             
             // Fill the matrix with numeric values
@@ -451,12 +460,12 @@ program define didintjl, rclass
 		local time_names ""
 		
 		forvalues i = 1/`=_N' {
-			di as text %-25s "`=`tmp_periods_post_treat'[`i']'" as text " |" as result %-16.7f `tmp_att_t'[`i'] as text " | " as result  %-7.3f `tmp_se_att_t'[`i'] as text "| " as result %-7.3f `tmp_pval_att_t'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_t'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_t'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_t'[`i'] as text "|"
+			di as text %-25s "`=`tmp_labels'[`i']'" as text " |" as result %-16.7f `tmp_att_t'[`i'] as text " | " as result  %-7.3f `tmp_se_att_t'[`i'] as text "| " as result %-7.3f `tmp_pval_att_t'[`i'] as text "| " as result  %-11.3f `tmp_jknifese_att_t'[`i'] as text "| " as result %-13.3f `tmp_jknifepval_att_t'[`i'] as text "|" as result %-9.3f `tmp_ri_pval_att_t'[`i'] as text "|"
     
 			di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 			
 			// Store the state name
-            local time_name = `tmp_periods_post_treat'[`i']
+            local time_name = `tmp_labels'[`i']
             local time_names `time_names' `time_name'
             
             // Fill the matrix with numeric values
@@ -513,6 +522,7 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.5.3 - changed the way that the results row labels are passed to Stata from Julia to try and work around a Stata-Julia interface bug
 *0.5.2 - fixed assignment issue with start_date / end_date
 *0.5.1 - changed use_pre_controls default to false
 *0.5.0 - added start_date and end_date args and removed autoadjust to conincide with new version of DiDInt.jl package
