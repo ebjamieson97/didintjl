@@ -1,16 +1,16 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.5.3 2025-09-22 */
+/*version 0.6.0 2025-10-10 */
 /*------------------------------------*/
 
 cap program drop didintjl
 program define didintjl, rclass
     version 16
-    syntax, outcome(string) state(string) time(string) ///
-            treated_states(string) treatment_times(string) ///
-            date_format(string) /// 
-            [covariates(string) ccc(string) agg(string) weighting(string) ref_column(string) ref_group(string) ///
+    syntax, outcome(varname) state(varname) time(varname) ///
+            [gvar(varname) ///
+            treated_states(string) treatment_times(string) date_format(string) /// 
+            covariates(string) ccc(string) agg(string) weighting(string) ref_column(string) ref_group(string) ///
             freq(string) freq_multiplier(int 1) start_date(string) end_date(string) ///
             nperm(int 1000) verbose(int 1) seed(int 0) use_pre_controls(int 0)]
 
@@ -41,6 +41,14 @@ program define didintjl, rclass
         exit 43
     }
 
+    // Check date_format
+    if "`date_format'" == "" {
+        qui jl: date_format = nothing
+    }
+    else {
+        qui jl: date_format = "`date_format'"
+    }
+
     // Check that DiDInt.jl for Julia is installed, update if updatejuliapackage == 1
     jl: using Pkg
     jl: if Base.find_package("DiDInt") === nothing              ///
@@ -53,55 +61,69 @@ program define didintjl, rclass
     qui jl save df
 
     // Allow some variables to be passed to Julia 
-    global outcome = "`outcome'"
-    global state = "`state'"
-    global time = "`time'"
-    global date_format = "`date_format'"
-    global nperm = `nperm'
-    global freq_multiplier = `freq_multiplier'
+    qui jl: outcome = Symbol("`outcome'")
+    qui jl: state = Symbol("`state'")
+    qui jl: time = Symbol("`time'")
+    qui jl: nperm = `nperm'
+    qui jl: freq_multiplier = `freq_multiplier'
+    if "`gvar'" != "" {
+        qui jl: gvar = Symbol("`gvar'")
+    }
+    else {
+        qui jl: gvar = nothing
+    }
+
     if "`freq'" == "" {
         qui jl: freq = nothing
     }
     else {
-        global freq = "`freq'"
-        qui jl: freq = "$freq"
+        qui jl: freq = "`freq'"
     }
 
     if "`start_date'" == "" {
         qui jl: start_date = nothing
     }
     else {
-        global start_date = "`start_date'"
-        qui jl: start_date = "$start_date"
+        qui jl: start_date = "`start_date'"
     }
     if "`end_date'" == "" {
         qui jl: end_date = nothing
     }
     else {
-        global end_date = "`end_date'"
-        qui jl: end_date = "$end_date"
+        qui jl: end_date = "`end_date'"
     }
 
     // Parse treated_states and treatment_times
-    qui jl: treated_states = String[]
-    qui jl: treated_times = String[]
-    qui tokenize "`treated_states'"
-    while "`1'" != "" {
-        local token = trim("`1'")
-        if ("`token'" != "") {
-            global treated_states_to_julia "`token'"
-            qui jl: push!(treated_states, "$treated_states_to_julia")
+    if "`treated_states'" != "" {
+        qui jl: treated_states = String[]
+        qui jl: treated_times = String[]
+        qui tokenize "`treated_states'"
+        while "`1'" != "" {
+            local token = trim("`1'")
+            if ("`token'" != "") {
+                qui jl: temp = "`token'"
+                qui jl: push!(treated_states, temp)
+            }
+            macro shift
         }
-        macro shift
     }
-    qui tokenize "`treatment_times'"
-    while "`1'" != "" {
-        local token = trim("`1'")
-        if ("`token'" != "") {
-            global treated_times_to_julia "`token'"
-            qui jl: push!(treated_times, "$treated_times_to_julia")
+    else {
+        qui jl: treated_states = nothing
+    }
+
+    if "`treatment_times'" != "" {
+        qui tokenize "`treatment_times'"
+        while "`1'" != "" {
+            local token = trim("`1'")
+            if ("`token'" != "") {
+                qui jl: temp = "`token'"
+                qui jl: push!(treated_times, temp)
+            }
+            macro shift
         }
-        macro shift
+    }
+    else {
+        qui jl: treated_times = nothing
     }
 
     // Parse covariates if necessary
@@ -114,32 +136,32 @@ program define didintjl, rclass
         while "`1'" != "" {
             local token = trim("`1'")
             if ("`token'" != "") {
-                global covariate_to_julia "`token'"
-                qui jl: push!(covariates, "$covariate_to_julia")
+                qui jl: temp = "`token'"
+                qui jl: push!(covariates, temp)
             }
             macro shift
         }
     }
 
     if "`ccc'" == "" {
-        global ccc = "int"
+        qui jl: ccc = "int"
     } 
     else {
-        global ccc = "`ccc'"
+        qui jl: ccc = "`ccc'"
     }
     
     if "`agg'" == "" {
-        global agg = "cohort"
+        qui jl: agg = "cohort"
     } 
     else {
-        global agg = "`agg'"
+        qui jl: agg = "`agg'"
     }
 
     if "`weighting'" == "" {
-        global weighting = "both"
+        qui jl: weighting = "both"
     } 
     else {
-        global weighting = "`weighting'"
+        qui jl: weighting = "`weighting'"
     }
  
     // Parse ref_column tokens with trimming
@@ -149,8 +171,8 @@ program define didintjl, rclass
         while "`1'" != "" {
             local token = trim("`1'")
             if ("`token'" != "") {
-                global ref_column_to_julia "`token'"
-                qui jl: push!(ref_keys, "$ref_column_to_julia")
+                qui jl: temp = "`token'"
+                qui jl: push!(ref_keys, temp)
             }
             macro shift
         }
@@ -167,8 +189,8 @@ program define didintjl, rclass
         while "`1'" != "" {
             local token = trim("`1'")
             if ("`token'" != "") {
-                global ref_group_to_julia "`token'"
-                qui jl: push!(ref_values, "$ref_group_to_julia")
+                qui jl: temp = "`token'"
+                qui jl: push!(ref_values, temp)
             }
             macro shift
         }
@@ -195,7 +217,7 @@ program define didintjl, rclass
     }
 	
 	// PART TWO: RUN DiDInt.jl and convert some columns to strings
-    qui jl: results = DiDInt.didint("$outcome", "$state", "$time", df, treated_states, treated_times, date_format = "$date_format", covariates = covariates, ccc = "$ccc", agg = "$agg", weighting = "$weighting", ref = ref, freq = freq, freq_multiplier = $freq_multiplier, start_date = start_date, end_date = end_date, nperm = $nperm, verbose = verbose, seed = seed, use_pre_controls = use_pre_controls)
+    jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, verbose = verbose, seed = seed, use_pre_controls = use_pre_controls)
 	
     qui jl: if "att_cohort" in DataFrames.names(results) ///
                 results.labels = string.(results.treatment_time); ///
@@ -515,13 +537,12 @@ program define didintjl, rclass
 	qui frame change default
     qui frame drop `result_frame'
 	
-	qui macro drop outcome state time date_format nperm freq_multiplier treated_states_to_julia treated_times_to_julia freq covariate_to_julia ref_column_to_julia ref_group_to_julia start_date end_date
-
 end
 
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.6.0 - changed syntax to accept varnames, added gvar option, overall more in line with csdid and Stata norms
 *0.5.3 - changed the way that the results row labels are passed to Stata from Julia to try and work around a Stata-Julia interface bug
 *0.5.2 - fixed assignment issue with start_date / end_date
 *0.5.1 - changed use_pre_controls default to false
