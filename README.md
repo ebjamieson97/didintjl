@@ -47,6 +47,7 @@ r(p) // for the p-value from the two-sided t-test of the aggregate att
 r(jkse) // for the jackknife standard error of the aggregate att
 r(jkp) // for the p-value from the two-sided t-test of the aggregate att using the jackknife standard error
 r(rip) // for the p-value resulting from the randomization inference procedure
+r(nperm) // see the number of random permutations that were done for randomization inference
 matrix list r(didint) // for the results table at the sub-aggregate ATT level
 ```
 
