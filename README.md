@@ -32,7 +32,7 @@ It is recommended to always use the latest version of the Julia package [DiDInt.
 jl: using Pkg; Pkg.update("DiDInt")
 ```
 
-### Get Help
+## Get Help
 More details can be found in the Stata help file.
 ```stata
 help didintjl
