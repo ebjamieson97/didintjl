@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.6.1 2025-10-10 */
+/*version 0.7.0 2025-10-11 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -12,7 +12,7 @@ program define didintjl, rclass
             treated_states(string) treatment_times(string) date_format(string) /// 
             covariates(string) ccc(string) agg(string) weighting(string) ref_column(string) ref_group(string) ///
             freq(string) freq_multiplier(int 1) start_date(string) end_date(string) ///
-            nperm(int 1000) verbose(int 1) seed(int 0) use_pre_controls(int 0)]
+            nperm(int 1000) seed(int 0) use_pre_controls(int 0)]
 
 	// PART ONE: BASIC SETUP 
     qui cap which jl
@@ -64,7 +64,7 @@ program define didintjl, rclass
     qui jl: outcome = Symbol("`outcome'")
     qui jl: state = Symbol("`state'")
     qui jl: time = Symbol("`time'")
-    qui jl: nperm = `nperm'
+    qui jl: nperm = `nperm' + 1
     qui jl: freq_multiplier = `freq_multiplier'
     if "`gvar'" != "" {
         qui jl: gvar = Symbol("`gvar'")
@@ -144,6 +144,7 @@ program define didintjl, rclass
     }
 
     if "`ccc'" == "" {
+        local ccc "int"
         qui jl: ccc = "int"
     } 
     else {
@@ -158,6 +159,7 @@ program define didintjl, rclass
     }
 
     if "`weighting'" == "" {
+        local weighting "both"
         qui jl: weighting = "both"
     } 
     else {
@@ -204,20 +206,9 @@ program define didintjl, rclass
     if "`ref_column'" == "" & "`ref_group'" == "" {
         qui jl: ref = nothing
     }
-
-    if `verbose' == 0 {
-        qui jl: verbose = false
-    }
-    else if `verbose' == 1 {
-        qui jl: verbose = true
-    }
-    else {
-        di as error "verbose must be 0 (False) or 1 (True)"
-        exit 5
-    }
 	
 	// PART TWO: RUN DiDInt.jl and convert some columns to strings
-    qui jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, verbose = verbose, seed = seed, use_pre_controls = use_pre_controls)
+    qui jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, seed = seed, use_pre_controls = use_pre_controls)
 	
     qui jl: if "att_cohort" in DataFrames.names(results) ///
                 results.labels = string.(results.treatment_time); ///
@@ -266,9 +257,9 @@ program define didintjl, rclass
 	if _rc == 0 & `condition_met' == 0 {
 		local condition_met 1
 		di as text "-----------------------------------------------------------------------------------------------------"
-		di as text "                                       DiDInt.jl Results                    "
+        di as text "                                DiDInt.jl Sub-Aggregate Results                                      "
 		di as text "-----------------------------------------------------------------------------------------------------"
-		di as text "State                     | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
+        di as text "State                     | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
 		di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"  
 		
 		// Initialize a temporary matrix to store the numeric results
@@ -303,21 +294,21 @@ program define didintjl, rclass
         matrix rownames `table_matrix' = `state_names'
         
         // Store the matrix in r()
-        return matrix restab = `table_matrix'
+        return matrix didint = `table_matrix'
         
 		local linesize = c(linesize)
 		if `linesize' < 103 {
 			di as text "Results table may be squished, try expanding Stata results window."
 		}
-		di as text _n "Aggregation Method: State"
+		di as text _n "Aggregation Method: " as result "State"
 	}
 	
     qui capture confirm variable `tmp_att_cohort'
 	if _rc == 0 & `condition_met' == 0 {
 		local condition_met 1
 		di as text "-----------------------------------------------------------------------------------------------------"
-		di as text "                                       DiDInt.jl Results                    "
-		di as text "-----------------------------------------------------------------------------------------------------"
+        di as text "                                DiDInt.jl Sub-Aggregate Results                                      "
+        di as text "-----------------------------------------------------------------------------------------------------"
 		di as text "Cohort                    | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
 		di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"  
 		
@@ -353,22 +344,22 @@ program define didintjl, rclass
         matrix rownames `table_matrix' = `cohort_names'
         
         // Store the matrix in r()
-        return matrix restab = `table_matrix'
+        return matrix didint = `table_matrix'
         
 		local linesize = c(linesize)
 		if `linesize' < 103 {
 			di as text "Results table may be squished, try expanding Stata results window."
 		}
-		di as text _n "Aggregation Method: Cohort"
+		di as text _n "Aggregation Method: " as result "Cohort"
 	}
 
     qui capture confirm variable `tmp_att_sgt'
 	if _rc == 0 & `condition_met' == 0 {
 		local condition_met 1
 		di as text "-----------------------------------------------------------------------------------------------------"
-		di as text "                                       DiDInt.jl Results                    "
+        di as text "                                DiDInt.jl Sub-Aggregate Results                                      "		
 		di as text "-----------------------------------------------------------------------------------------------------"
-		di as text "s;g;t                       | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
+        di as text "s;g;t                       | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
 		di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 		
 		// Initialize a temporary matrix to store the numeric results
@@ -405,22 +396,22 @@ program define didintjl, rclass
         matrix rownames `table_matrix' = `sgt_names'
         
         // Store the matrix in r()
-        return matrix restab = `table_matrix'
+        return matrix didint = `table_matrix'
         
 		local linesize = c(linesize)
 		if `linesize' < 103 {
 			di as text "Results table may be squished, try expanding Stata results window."
 		}
-		di as text _n "Aggregation Method: sgt"
+		di as text _n "Aggregation Method: " as result "sgt"
 	}
 
     qui capture confirm variable `tmp_att_gt'
 	if _rc == 0 & `condition_met' == 0 {
 		local condition_met 1
 		di as text "-----------------------------------------------------------------------------------------------------"
-		di as text "                                       DiDInt.jl Results                    "
-		di as text "-----------------------------------------------------------------------------------------------------"
-		di as text "g;t                       | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
+        di as text "                                DiDInt.jl Sub-Aggregate Results                                      "
+	    di as text "-----------------------------------------------------------------------------------------------------"
+        di as text "g;t                       | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
 		di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"
 		
 		// Initialize a temporary matrix to store the numeric results
@@ -456,22 +447,22 @@ program define didintjl, rclass
         matrix rownames `table_matrix' = `gt_names'
         
         // Store the matrix in r()
-        return matrix restab = `table_matrix'
+        return matrix didint = `table_matrix'
         
 		local linesize = c(linesize)
 		if `linesize' < 103 {
 			di as text "Results table may be squished, try expanding Stata results window."
 		}
-		di as text _n "Aggregation Method: Simple"
+		di as text _n "Aggregation Method: " as result "Simple"
 	}
 
     qui capture confirm variable `tmp_att_t'
 	if _rc == 0 & `condition_met' == 0 {
 		local condition_met 1
 		di as text "-----------------------------------------------------------------------------------------------------"
-		di as text "                                       DiDInt.jl Results                    "
+        di as text "                                DiDInt.jl Sub-Aggregate Results                                      "		
 		di as text "-----------------------------------------------------------------------------------------------------"
-		di as text "Periods Since Treatment   | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
+        di as text "Periods Since Treatment   | " as text "ATT             | SE     | p-val  | JKNIFE SE  | JKNIFE p-val | RI p-val"
 		di as text "--------------------------|-----------------|--------|--------|------------|--------------|---------|"  
 		
 		// Initialize a temporary matrix to store the numeric results
@@ -506,24 +497,45 @@ program define didintjl, rclass
         matrix rownames `table_matrix' = `state_names'
         
         // Store the matrix in r()
-        return matrix restab = `table_matrix'
+        return matrix didint = `table_matrix'
         
 		local linesize = c(linesize)
 		if `linesize' < 103 {
 			di as text "Results table may be squished, try expanding Stata results window."
 		}
-		di as text _n "Aggregation Method: Periods Since Treatment"
+		di as text _n "Aggregation Method: " as result "Periods Since Treatment"
 	}
-	
-	
+
+    if "`ccc'" == "int" {
+        local model_spec "Two-way DID-INT"
+    }
+    else if "`ccc'" == "state" {
+        local model_spec "State-varying DID-INT"
+    }
+    else if "`ccc'" == "time" {
+        local model_spec "Time-varying DID-INT"
+    }
+    else if "`ccc'" == "hom" {
+        local model_spec "Homogeneous DID-INT"
+    }
+    else if "`ccc'" == "add" {
+        local model_spec "Two one-way DID-INT"
+    }
+    
+    di as text "Model Specification: " as result "`model_spec'"
+    di as text "Weighting: " as result "`weighting'"
+       
        // Display aggregate results
-       di as text _n "Aggregate Results:"
+       di as text _n "---------------------------------"
+       di as text "   DiDInt.jl: Aggregate Results   "
+       di as text "---------------------------------"
        di as text "Aggregate ATT: " as result `tmp_agg_att'[1]
        di as text "Standard error: " as result `tmp_se_agg_att'[1]
        di as text "p-value: " as result `tmp_pval_agg_att'[1]
        di as text "Jackknife SE: " as result `tmp_jknifese_agg_att'[1]
        di as text "Jackknife p-value: " as result `tmp_jknifepval_agg_att'[1]
        di as text "RI p-value: " as result `tmp_ri_pval_agg_att'[1]
+       di as text "Random permutations: " as result `tmp_nperm'[1]
 	   
 	// Store aggregate results in r()
     return scalar att = `tmp_agg_att'[1]
@@ -532,6 +544,7 @@ program define didintjl, rclass
     return scalar jkse = `tmp_jknifese_agg_att'[1]
     return scalar jkp = `tmp_jknifepval_agg_att'[1]
     return scalar rip = `tmp_ri_pval_agg_att'[1]
+    return scalar nperm = `tmp_nperm'[1]
     
 	qui drop _all
 	qui frame change default
@@ -542,6 +555,7 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.7.0 - updated output display, changed return matrix name from restab to didint
 *0.6.1 - forgot a qui smh
 *0.6.0 - changed syntax to accept varnames, added gvar option, overall more in line with csdid and Stata norms
 *0.5.3 - changed the way that the results row labels are passed to Stata from Julia to try and work around a Stata-Julia interface bug
