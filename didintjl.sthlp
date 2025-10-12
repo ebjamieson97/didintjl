@@ -81,13 +81,13 @@ It requires you to specify the names of the outcome, state, and time variables a
 {synopt:{opt treatment_times(string)}}list of treatment times (use with treated_states){p_end}
 
 {syntab:Date Options}
-{synopt:{opt date_format(string)}}format of time variable (e.g., "yyyy/mm/dd", "ddmonyyyy"){p_end}
-{synopt:{opt start_date(string)}}starting date for analysis window{p_end}
-{synopt:{opt end_date(string)}}ending date for analysis window{p_end}
+{synopt:{opt date_format(string)}}format of time variable, start_date, end_date, and treatment_times{p_end}
 
-{syntab:Date Options (Staggered Adoption Only)}
+{syntab:Period Grid Construction (Staggered Adoption Only)}
 {synopt:{opt freq(string)}}time period frequency: "year", "month", "week", or "day"; triggers date matching procedure{p_end}
 {synopt:{opt freq_multiplier(integer)}}multiplier for freq (default: 1); e.g., 2 for two-year periods. Has no effect unless used with {cmd:freq}.{p_end}
+{synopt:{opt start_date(string)}}starting date for the period grid construction{p_end}
+{synopt:{opt end_date(string)}}ending date for the period grid construction{p_end}
 
 {syntab:Covariates}
 {synopt:{opt covariates(varnames or string)}}space-separated list of covariate names{p_end}
@@ -97,8 +97,8 @@ It requires you to specify the names of the outcome, state, and time variables a
 
 {syntab:CCC, Aggregation, and Weighting}
 {synopt:{opt ccc(string)}}CCC violation to control for: "hom", "time", "state", "add", or "int" (default: "int"){p_end}
-{synopt:{opt agg(string)}}aggregation method for results{p_end}
-{synopt:{opt weighting(string)}}weighting scheme for aggregation{p_end}
+{synopt:{opt agg(string)}}aggregation method{p_end}
+{synopt:{opt weighting(string)}}weighting scheme{p_end}
 
 {syntab:Inference}
 {synopt:{opt nperm(integer)}}number of permutations for randomization inference (default: 999){p_end}
@@ -282,12 +282,16 @@ ATTs) and {cmd:att} weighting (when computing the aggregate ATT).{p_end}
 {title:Date Matching Procedure for Staggered Adoption Settings}
 
 {pstd}
-When {cmd:freq} is specified in staggered adoption settings, {cmd:didintjl} performs a date 
-matching procedure to align observations and treatment times to period boundaries:
+If {cmd:freq} is not specified in staggered adoption settings, every unique date found in 
+the data is treated as a distinct period. When {cmd:freq} is specified in staggered adoption settings,
+{cmd:didintjl} performs a date matching procedure to align observations and treatment times to period boundaries:
 
 {phang}
 1. Period grid construction: A sequence of period start dates is created from {cmd:start_date} 
-to {cmd:end_date} using the specified {cmd:freq} and {cmd:freq_multiplier}.
+to {cmd:end_date} using the specified {cmd:freq} and {cmd:freq_multiplier}. By default, 
+{cmd:start_date} and {cmd:end_date} are set to the minimum and maximum dates in the data 
+unless explicitly specified by the user. If either {cmd:start_date} or {cmd:end_date} are specified,
+then {cmd:date_format} will have to be specified as well.
 
 {phang}
 2. Observation matching: Each observation's time value is matched to the most recently passed 
@@ -301,27 +305,27 @@ is greater than or equal to each treatment time. That is, if a treatment occurs 
 boundaries (as opposed to directly at a period boundary), it is matched forward to the next period boundary.
 
 {pstd}
+{bf:Edge cases:} Observations occurring before the first period boundary are matched to the 
+first period. Observations occurring at or after the last period boundary are matched to the 
+last period.
+
+{pstd}
+{bf:Example:} Consider yearly data from 1989-2000 with seven treatment cohorts (1991, 1993, 
+1996, 1997, 1998, 1999, 2000). Specifying {cmd:freq("year")} and {cmd:freq_multiplier(2)} 
+creates a 2-year period grid: [1989, 1991, 1993, 1995, 1997, 1999]. Treatment times are 
+matched forward to period boundaries: 1991→1991, 1993→1993, 1996→1997, 1998→1999,
+1999→1999, 2000→1999 (capped at the last period). This consolidates the seven cohorts
+into four (1991, 1993, 1997, 1999). For observations, when no treatment occurs between 
+period boundaries, all observations in that interval are matched to the earlier boundary 
+(e.g., observations in 1993 and 1994 both match to period 1993). However, the 1996 treatment 
+splits the [1995, 1997) interval: observations in 1995 match to period 1995, while observations
+in 1996 match forward to period 1997 (along with the treatment time at 1996).
+Observations in 2000 are capped at the final period 1999.
+
+{pstd}
 {bf:Note:} The date matching procedure is only relevant for staggered adoption designs. 
 In common adoption settings (where all treated units adopt at the same time), observations 
 are simply classified as "pre" or "post" treatment, making date matching unnecessary.
-
-{pstd}
-If {cmd:freq} is not specified in staggered adoption settings, every unique date found in 
-the data is treated as a distinct period. Depending on the data you are working with, this may result in:
-
-{phang}
-- Uneven period lengths
-
-{phang}
-- An unexpectedly large number of periods if your data contains high-frequency observations
-
-{phang}
-- Treatment times that don't align exactly with observation dates, causing an error
-
-{pstd}
-For example, if you have quarterly data but want to analyze at an annual level, you should 
-specify {cmd:freq("year")} to aggregate quarters into years. Otherwise, each quarter will 
-be treated as a separate period.
 
 
 {title:Randomization Inference Procedure}
@@ -421,6 +425,6 @@ with Few Treated Clusters." {browse "https://www.sciencedirect.com/science/artic
 
 {* didintjl                                           }
 {* written by Eric Jamieson                           }
-{* version 0.7.0 2025-10-11                           }
+{* version 0.7.1 2025-10-12                           }
 
 {smcl}

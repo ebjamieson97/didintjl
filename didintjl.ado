@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.7.0 2025-10-11 */
+/*version 0.7.1 2025-10-12 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -208,7 +208,7 @@ program define didintjl, rclass
     }
 	
 	// PART TWO: RUN DiDInt.jl and convert some columns to strings
-    qui jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, seed = seed, use_pre_controls = use_pre_controls)
+     jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, seed = seed, use_pre_controls = use_pre_controls);
 	
     qui jl: if "att_cohort" in DataFrames.names(results) ///
                 results.labels = string.(results.treatment_time); ///
@@ -549,12 +549,14 @@ program define didintjl, rclass
 	qui drop _all
 	qui frame change default
     qui frame drop `result_frame'
+	qui jl: results = nothing; GC.gc()
 	
 end
 
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.7.1 - run didint() from Julia with ; ending, shows error messages, but suppresses other displays. Clear results from Julia memory after running
 *0.7.0 - updated output display, changed return matrix name from restab to didint
 *0.6.1 - forgot a qui smh
 *0.6.0 - changed syntax to accept varnames, added gvar option, overall more in line with csdid and Stata norms

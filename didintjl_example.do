@@ -15,6 +15,7 @@ gen year_numeric = real(year)
 bysort state (year_numeric): egen gvar = min(cond(merit == 1, year_numeric, .))
 replace gvar = 0 if missing(gvar) // This line is actually optional, you can leave non-treated states as having a missing gvar value
 
+
 didintjl, outcome(coll) state(state) time(year_numeric) gvar(gvar) covariates(asian male black) seed(1234)
 
 // Other ccc options include :
