@@ -15,6 +15,9 @@ didintjl will automatically download the DiDInt.jl package for Julia if it is no
 net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/")
 ```
 
+### Under Development
+Please note that the **didintjl_plot** command is still under development and is not functional at this time.
+
 ### Update
 ```stata
 net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/") replace

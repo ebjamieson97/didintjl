@@ -1,3 +1,4 @@
 v 3
 p didintjl Intersection difference-in-differences
 p didintjl Compute ATT with covariates that vary by state, time, or both
+p didintjl_plot Plot parallel trends or event study plots

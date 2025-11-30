@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.7.1 2025-10-12 */
+/*version 0.7.2 2025-11-23 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -12,7 +12,7 @@ program define didintjl, rclass
             treated_states(string) treatment_times(string) date_format(string) /// 
             covariates(string) ccc(string) agg(string) weighting(string) ref_column(string) ref_group(string) ///
             freq(string) freq_multiplier(int 1) start_date(string) end_date(string) ///
-            nperm(int 1000) seed(int 0) use_pre_controls(int 0)]
+            nperm(int 999) seed(int 0) use_pre_controls(int 0) hc(int 3)]
 
 	// PART ONE: BASIC SETUP 
     qui cap which jl
@@ -41,6 +41,9 @@ program define didintjl, rclass
         exit 43
     }
 
+    // Pass hc arg to julia
+    qui jl: hc = `hc'
+
     // Check date_format
     if "`date_format'" == "" {
         qui jl: date_format = nothing
@@ -49,14 +52,14 @@ program define didintjl, rclass
         qui jl: date_format = "`date_format'"
     }
 
-    // Check that DiDInt.jl for Julia is installed, update if updatejuliapackage == 1
-    jl: using Pkg
-    jl: if Base.find_package("DiDInt") === nothing              ///
+    // Check that DiDInt.jl for Julia is installed
+    qui jl: using Pkg
+    qui jl: if Base.find_package("DiDInt") === nothing              ///
             SF_display("DiDInt.jl not installed, installing now.");  ///
             Pkg.add(url="https://github.com/ebjamieson97/DiDInt.jl"); ///
             SF_display(" DiDInt.jl is done installing.");             ///
         end        
-    jl: using DiDInt
+    qui jl: using DiDInt
 
     qui jl save df
 
@@ -64,7 +67,7 @@ program define didintjl, rclass
     qui jl: outcome = Symbol("`outcome'")
     qui jl: state = Symbol("`state'")
     qui jl: time = Symbol("`time'")
-    qui jl: nperm = `nperm' + 1
+    qui jl: nperm = `nperm'
     qui jl: freq_multiplier = `freq_multiplier'
     if "`gvar'" != "" {
         qui jl: gvar = Symbol("`gvar'")
@@ -208,7 +211,7 @@ program define didintjl, rclass
     }
 	
 	// PART TWO: RUN DiDInt.jl and convert some columns to strings
-     jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, seed = seed, use_pre_controls = use_pre_controls);
+    qui jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, seed = seed, use_pre_controls = use_pre_controls, hc = hc);
 	
     qui jl: if "att_cohort" in DataFrames.names(results) ///
                 results.labels = string.(results.treatment_time); ///
@@ -556,6 +559,7 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.7.2 - added hc arg and changed nperm to 999
 *0.7.1 - run didint() from Julia with ; ending, shows error messages, but suppresses other displays. Clear results from Julia memory after running
 *0.7.0 - updated output display, changed return matrix name from restab to didint
 *0.6.1 - forgot a qui smh
