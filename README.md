@@ -4,34 +4,25 @@ This Stata package acts as a wrapper for the Julia package DiDInt.jl.
 **didintjl** allows for unbiased estimation of the average effect of treatment on the treated (ATT) using a difference-in-differences framework that allows for covariates whose effects on the outcome of interest may vary by state and/or time, see https://arxiv.org/abs/2412.14447 for more details.
 
 ## Requirements
-* **Julia**: Version 1.11.6 or later
+* **Julia**: Version 1.11.7
 * **Stata**: Version 16 or later
-* **David Roodman’s Julia package for Stata**: [julia.ado](https://github.com/droodman/julia.ado) version 1.1.10 or later
+* **David Roodman’s Julia package for Stata**: [julia.ado](https://github.com/droodman/julia.ado) version 1.2.2 (Nov 26, 2025)
+* **DiDInt.jl**: Version 0.6.15
 
 ## Installation 
+
+```stata
+net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/")
+
+* And to update: 
+net install didintjl, replace from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/")
+```
+
 didintjl will automatically download the DiDInt.jl package for Julia if it is not found to be downloaded already.
 
-```stata
-net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/")
-```
-
-### Under Development
-Please note that the **didintjl_plot** command is still under development and is not functional at this time.
-
-### Update
-```stata
-net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/") replace
-
-* Alternatively, if you run into issues, you could try:
-ado uninstall didintjl
-net install didintjl, from("https://raw.githubusercontent.com/ebjamieson97/didintjl/main/")
-```
-
-### Managing Julia Packages from Stata
-It is recommended to always use the latest version of the Julia package [DiDInt.jl](https://github.com/ebjamieson97/DiDInt.jl) along with the latest version of this Stata wrapper, **didintjl**.
+You can update the [DiDInt.jl](https://github.com/ebjamieson97/DiDInt.jl) package directly from Stata by running the following.
 
 ```stata
-* You can update the DiDInt.jl package for Julia from Stata as follows
 jl: using Pkg; Pkg.update("DiDInt")
 ```
 
@@ -55,6 +46,8 @@ matrix list r(didint) // for the results table at the sub-aggregate ATT level
 ```
 
 ## Example
+
+### `didintjl`
 
 - **Example do-file:** [`didintjl_example.do`](./didintjl_example.do)
 - **Example dataset:** [`MeritExampleDataDiDIntjl.dta`](./MeritExampleDataDiDIntjl.dta)
@@ -165,3 +158,28 @@ Random permutations: 1000
 
 ```
 
+### `didintjl_plot`
+
+```stata
+use "MeritExampleDataDiDIntjl.dta", clear
+* Here I am just using a subset of the data for purposes of demonstration
+* looking at trends for every state in data is a bit cluttered
+keep if inlist(state, "34", "71", "11", "14")
+didintjl_plot, outcome("coll") state("state") time("year") treatment_times("2000 1991") date_format("yyyy") covariates("asian male black") ccc("hom int")
+```
+
+![parallel_trends](./images/parallel_trends.png)
+
+
+```stata
+use "MeritExampleDataDiDIntjl.dta", clear
+
+* didintjl and didintjl_plot also work with gvar arg
+gen year_numeric = real(year) 
+bysort state (year_numeric): egen gvar = min(cond(merit == 1, year_numeric, .))
+
+* Specify the event(1) arg to get event plots!
+didintjl_plot, outcome(coll) state(state) time(year_numeric) gvar(gvar) date_format("yyyy") covariates("asian male black") event(1) 
+```
+
+![event_study](/images/event_study.png)

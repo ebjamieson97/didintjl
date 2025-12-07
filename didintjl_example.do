@@ -1,6 +1,5 @@
 use "MeritExampleDataDiDIntjl.dta", clear
 
-
 * aggregation is by "cohort" (treatment time cohort) and weighting is set to "both" (applies weighting while computing sub-aggregate level ATTs and when computing the aggregate ATT from the sub-aggregate ATTs) by default. The ccc() option is set to "int" by default. 
 * For more details, call:
 help didintjl
