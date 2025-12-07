@@ -9,6 +9,10 @@ This Stata package acts as a wrapper for the Julia package DiDInt.jl.
 * **David Roodman’s Julia package for Stata**: [julia.ado](https://github.com/droodman/julia.ado) version 1.2.2 (Nov 26, 2025)
 * **DiDInt.jl**: Version 0.6.15
 
+### Suggested
+
+* grc1leg2 (the legend for the parallel trends plots comes out a bit nicer if you have this Stata package)
+
 ## Installation 
 
 ```stata
