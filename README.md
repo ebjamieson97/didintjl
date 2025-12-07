@@ -164,6 +164,9 @@ Random permutations: 1000
 
 ### `didintjl_plot`
 
+- **Example do-file:** [`didintjl_plot_example.do`](./didintjl_plot_example.do)
+- **Example dataset:** [`MeritExampleDataDiDIntjl.dta`](./MeritExampleDataDiDIntjl.dta)
+
 ```stata
 use "MeritExampleDataDiDIntjl.dta", clear
 * Here I am just using a subset of the data for purposes of demonstration
