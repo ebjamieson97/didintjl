@@ -62,6 +62,7 @@ It requires you to specify the names of the outcome, state, and time variables a
 {cmd:end_date(}{it:string}{cmd:)}
 {cmd:nperm(}{it:integer}{cmd:)}
 {cmd:seed(}{it:integer}{cmd:)}
+{cmd:truejack(}{it:integer}{cmd:)}
 {cmd:use_pre_controls(}{it:integer}{cmd:)}]
 {p_end}
 
@@ -103,6 +104,7 @@ It requires you to specify the names of the outcome, state, and time variables a
 {syntab:Inference}
 {synopt:{opt nperm(integer)}}number of permutations for randomization inference (default: 999){p_end}
 {synopt:{opt seed(integer)}}random seed for replication{p_end}
+{synopt:{opt truejack(integer)}}jackknife method: 1 = re-estimate from first step, 0 = use diff matrix (default: 0){p_end}
 {synoptline}
 {p2colreset}{...}
 
