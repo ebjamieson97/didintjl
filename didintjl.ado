@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.7.3 2026-01-26 */
+/*version 0.7.4 2026-01-26 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -222,7 +222,7 @@ program define didintjl, rclass
     }
 	
 	// PART TWO: RUN DiDInt.jl and convert some columns to strings
-    qui jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, seed = seed, use_pre_controls = use_pre_controls, hc = hc, truejack = truejack);
+    jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, seed = seed, use_pre_controls = use_pre_controls, hc = hc, truejack = truejack);
 	
     qui jl: if "att_cohort" in DataFrames.names(results) ///
                 results.labels = string.(results.treatment_time); ///
@@ -570,6 +570,7 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.7.4 - better error messaging
 *0.7.3 - added arg for truejack
 *0.7.2 - added hc arg and changed nperm to 999
 *0.7.1 - run didint() from Julia with ; ending, shows error messages, but suppresses other displays. Clear results from Julia memory after running

@@ -7,7 +7,7 @@ This Stata package acts as a wrapper for the Julia package DiDInt.jl.
 * **Julia**: Version 1.11.7
 * **Stata**: Version 16 or later
 * **David Roodman’s Julia package for Stata**: [julia.ado](https://github.com/droodman/julia.ado) version 1.2.2 (Nov 26, 2025)
-* **DiDInt.jl**: Version 0.6.15
+* **DiDInt.jl**: Version 0.6.15 or later
 
 ### Suggested
 
