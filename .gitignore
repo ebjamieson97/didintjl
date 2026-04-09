@@ -4,3 +4,7 @@ merit-didint.do
 test_data.dta
 test_plotting.do
 test.log
+abridged data.dta
+bigdatatest.log
+check_invalid.log
+test_big_data.do

@@ -63,7 +63,8 @@ It requires you to specify the names of the outcome, state, and time variables a
 {cmd:nperm(}{it:integer}{cmd:)}
 {cmd:seed(}{it:integer}{cmd:)}
 {cmd:truejack(}{it:integer}{cmd:)}
-{cmd:use_pre_controls(}{it:integer}{cmd:)}]
+{cmd:use_pre_controls(}{it:integer}{cmd:)}
+{cmd:process(}{it:integer}{cmd:)}]
 {p_end}
 
 {title:Parameters}
@@ -105,6 +106,13 @@ It requires you to specify the names of the outcome, state, and time variables a
 {synopt:{opt nperm(integer)}}number of permutations for randomization inference (default: 999){p_end}
 {synopt:{opt seed(integer)}}random seed for replication{p_end}
 {synopt:{opt truejack(integer)}}jackknife method: 1 = re-estimate from first step, 0 = use diff matrix (default: 0){p_end}
+
+{syntab:Data Processing}
+{synopt:{opt process(integer)}}automatic processing of labeled covariate variables before passing to Julia (0 = off, 1 = on, default: 1).
+When enabled, any covariate with a value label attached is decoded and then tested for numeric conversion.
+If all decoded values are numeric, the value label is stripped and the variable is passed as numeric.
+If the decoded values contain non-numeric characters (e.g. occupation or race category names), the variable is converted from a labeled numeric to a string and passed as a string categorical.
+A warning message is displayed for each variable that is converted. Set {cmd:process(0)} to skip this conversion and pass all variables as-is.{p_end}
 {synoptline}
 {p2colreset}{...}
 
@@ -427,6 +435,6 @@ with Few Treated Clusters." {browse "https://www.sciencedirect.com/science/artic
 
 {* didintjl                                           }
 {* written by Eric Jamieson                           }
-{* version 0.7.1 2025-10-12                           }
+{* version 0.7.5 2026-04-08                           }
 
 {smcl}

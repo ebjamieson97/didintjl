@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.7.4 2026-01-26 */
+/*version 0.7.5 2026-04-08 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -12,7 +12,7 @@ program define didintjl, rclass
             treated_states(string) treatment_times(string) date_format(string) /// 
             covariates(string) ccc(string) agg(string) weighting(string) ref_column(string) ref_group(string) ///
             freq(string) freq_multiplier(int 1) start_date(string) end_date(string) ///
-            nperm(int 999) seed(int 0) use_pre_controls(int 0) hc(int 3) truejack(int 0)]
+            nperm(int 999) seed(int 0) use_pre_controls(int 0) hc(int 3) truejack(int 0) process(int 1)]
 
 	// PART ONE: BASIC SETUP 
     qui cap which jl
@@ -20,6 +20,12 @@ program define didintjl, rclass
         di as error "The 'julia' package is required but not installed or not found in the system path. See https://github.com/droodman/julia.ado for more details."
         exit 3
     } 
+
+    // Check process
+    if `process' != 0 & `process' != 1 {
+        di as error "process must be either 1 (true) or 0 (false)."
+        exit 42
+    }
 
     // Check seed value 
     if `seed' == 0 {
@@ -72,7 +78,44 @@ program define didintjl, rclass
         end        
     qui jl: using DiDInt
 
+    // This section is to deal with the invalid warnings and to ensure proper conversion of categorical variables
+    local allvars `outcome' `state' `time'
+    if "`covariates'" != "" {
+        local allvars `allvars' `covariates'
+    }
+    if "`gvar'" != "" {
+        local allvars `allvars' `gvar'
+    }
+    preserve
+    keep `allvars'
+    if `process' == 1 {
+        local covariates_and_outcome `covariates' `outcome'
+        foreach v of local covariates_and_outcome {
+            local vallabel : value label `v'
+            if "`vallabel'" != "" {
+                quietly decode `v', gen(`v'_decoded)
+                quietly destring `v'_decoded, gen(`v'_test) ignore(",")
+                quietly count if missing(`v'_test) & !missing(`v')
+                if r(N) == 0 {
+                    local converted 1
+                    // Truly numeric - just strip label
+                    drop `v'_decoded `v'_test
+                    quietly label values `v' .
+                    di as text "Warning: `v' has a value label but contains numeric data. Value label stripped, variable passed as numeric. Set 'process(0)' to skip this conversion."
+                }
+                else {
+                    // Real categorical - replace with decoded string
+                    drop `v' `v'_test
+                    rename `v'_decoded `v'
+                    di as text "Warning: `v' has a value label and contains non-numeric data. Variable converted from numeric to string. Set 'process(0)' to skip this conversion."
+                }
+            }
+        }
+        qui label drop _all
+        qui notes drop _all
+    }
     qui jl save df
+    restore
 
     // Allow some variables to be passed to Julia 
     qui jl: outcome = Symbol("`outcome'")
@@ -570,6 +613,7 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.7.5 - Added better processing for labelled variables
 *0.7.4 - better error messaging
 *0.7.3 - added arg for truejack
 *0.7.2 - added hc arg and changed nperm to 999
