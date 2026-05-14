@@ -1,7 +1,7 @@
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.7.5 2026-04-08 */
+/*version 0.7.6 2026-05-13 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -12,7 +12,7 @@ program define didintjl, rclass
             treated_states(string) treatment_times(string) date_format(string) /// 
             covariates(string) ccc(string) agg(string) weighting(string) ref_column(string) ref_group(string) ///
             freq(string) freq_multiplier(int 1) start_date(string) end_date(string) ///
-            nperm(int 999) seed(int 0) use_pre_controls(int 0) hc(int 3) truejack(int 0) process(int 1)]
+            nperm(int 999) seed(int 0) use_pre_controls(int 0) hc(int 3) truejack(int 0) edgecase(int 0) process(int 1)]
 
 	// PART ONE: BASIC SETUP 
     qui cap which jl
@@ -44,6 +44,17 @@ program define didintjl, rclass
     }
     else {
         di as error "truejack must be either 1 (true) or 0 (false)."
+    }
+
+    // Check edgecase
+    if `edgecase' == 0 {
+        qui jl: edgecase = false
+    }
+    else if `edgecase' == 1 {
+        qui jl: edgecase = true
+    }
+    else {
+        di as error "edgecase must be either 1 (true) or 0 (false)."
     }
 
     // Check use_pre_controls arg
@@ -89,8 +100,12 @@ program define didintjl, rclass
     preserve
     keep `allvars'
     if `process' == 1 {
-        local covariates_and_outcome `covariates' `outcome'
-        foreach v of local covariates_and_outcome {
+        local outlabel : value label `outcome'
+        if "`outlabel'" != "" {
+            quietly label values `outcome' .
+            di as text "Warning: `outcome' has a value label. Label stripped to ensure numeric outcome. Set 'process(0)' to skip this conversion."
+        }
+        foreach v of local covariates {
             local vallabel : value label `v'
             if "`vallabel'" != "" {
                 quietly decode `v', gen(`v'_decoded)
@@ -265,7 +280,7 @@ program define didintjl, rclass
     }
 	
 	// PART TWO: RUN DiDInt.jl and convert some columns to strings
-    jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, seed = seed, use_pre_controls = use_pre_controls, hc = hc, truejack = truejack);
+    jl: results = DiDInt.didint(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ccc = ccc, agg = agg, weighting = weighting, ref = ref, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, nperm = nperm, seed = seed, use_pre_controls = use_pre_controls, hc = hc, truejack = truejack, edgecase = edgecase);
 	
     qui jl: if "att_cohort" in DataFrames.names(results) ///
                 results.labels = string.(results.treatment_time); ///
@@ -613,6 +628,7 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.7.6 - Added arg for edgecase, made sure value labels are dropped for outcome
 *0.7.5 - Added better processing for labelled variables
 *0.7.4 - better error messaging
 *0.7.3 - added arg for truejack
