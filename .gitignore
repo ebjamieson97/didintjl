@@ -8,3 +8,5 @@ abridged data.dta
 bigdatatest.log
 check_invalid.log
 test_big_data.do
+julia env versions.log
+ACS regressions.do

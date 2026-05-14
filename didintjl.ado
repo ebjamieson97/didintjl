@@ -1,3 +1,4 @@
+*! didintjl 0.7.6 13 May 2026
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
