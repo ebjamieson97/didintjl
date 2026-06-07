@@ -16,6 +16,29 @@ Based on Karim & Webb (2025) {browse "https://arxiv.org/abs/2412.14447"}.
 It requires you to specify the names of the outcome, state, and time variables as well as either a gvar variable, or, to specifically list the treated states and their treatment times.
 {p_end}
 
+{title:Requirements}
+
+{pstd}
+{cmd:didintjl} and {cmd:didintjl_plot} are tested and designed for the following versions:{p_end}
+
+{synoptset 35 tabbed}{...}
+{synopthdr:Requirement}
+{synoptline}
+{synopt:{bf:Julia}}version 1.12.0 or later{p_end}
+{synopt:{bf:Stata}}version 16 or later{p_end}
+{synopt:{bf:julia.ado}}version 2.0.0 or later ({browse "https://github.com/droodman/julia.ado"}){p_end}
+{synopt:{bf:DiDInt.jl}}version 0.9.6 or later ({browse "https://github.com/ebjamieson97/DiDInt.jl"}){p_end}
+{synoptline}
+{p2colreset}{...}
+
+{pstd}
+To install {bf:julia.ado}, run:{p_end}
+{phang2}{cmd:. ssc install julia}{p_end}
+
+{pstd}
+To install {bf:DiDInt.jl}, run:{p_end}
+{phang2}{cmd:. jl AddPkg DiDInt}{p_end}
+
 {title:Stored results}
 
 {pstd}
@@ -63,7 +86,10 @@ It requires you to specify the names of the outcome, state, and time variables a
 {cmd:nperm(}{it:integer}{cmd:)}
 {cmd:seed(}{it:integer}{cmd:)}
 {cmd:truejack(}{it:integer}{cmd:)}
+{cmd:notyet(}{it:integer}{cmd:)}
 {cmd:use_pre_controls(}{it:integer}{cmd:)}
+{cmd:hc(}{it:integer}{cmd:)}
+{cmd:edgecase(}{it:integer}{cmd:)}
 {cmd:process(}{it:integer}{cmd:)}]
 {p_end}
 
@@ -95,6 +121,7 @@ It requires you to specify the names of the outcome, state, and time variables a
 {synopt:{opt covariates(varnames or string)}}space-separated list of covariate names{p_end}
 {synopt:{opt ref_column(string)}}column name for categorical reference variable{p_end}
 {synopt:{opt ref_group(string)}}reference group for categorical variable (requires ref_column){p_end}
+{synopt:{opt notyet(integer)}}shorthand for {cmd:use_pre_controls()}; use pre-treatment periods from treated states as controls (0 is false, 1 is true). Overwrites {cmd:use_pre_controls()} if both are specified.{p_end}
 {synopt:{opt use_pre_controls(integer)}}use pre-treatment periods from treated states as controls (0 is false, 1 is true, default: 0){p_end}
 
 {syntab:CCC, Aggregation, and Weighting}
@@ -106,13 +133,16 @@ It requires you to specify the names of the outcome, state, and time variables a
 {synopt:{opt nperm(integer)}}number of permutations for randomization inference (default: 999){p_end}
 {synopt:{opt seed(integer)}}random seed for replication{p_end}
 {synopt:{opt truejack(integer)}}jackknife method: 1 = re-estimate from first step, 0 = use diff matrix (default: 0){p_end}
+{synopt:{opt hc(integer)}}heteroskedasticity-consistent standard error type (default: 1){p_end}
+{synopt:{opt edgecase(integer)}}when enabled, computes standard errors for ATTs in the edge case where only two states contribute to a long difference regression, using variance and covariance terms of the relevant means. Computationally expensive; disabled by default (0 = false, 1 = true, default: 0){p_end}
 
 {syntab:Data Processing}
 {synopt:{opt process(integer)}}automatic processing of labeled covariate variables before passing to Julia (0 = off, 1 = on, default: 1).
 When enabled, any covariate with a value label attached is decoded and then tested for numeric conversion.
 If all decoded values are numeric, the value label is stripped and the variable is passed as numeric.
 If the decoded values contain non-numeric characters (e.g. occupation or race category names), the variable is converted from a labeled numeric to a string and passed as a string categorical.
-A warning message is displayed for each variable that is converted. Set {cmd:process(0)} to skip this conversion and pass all variables as-is.{p_end}
+A warning message is displayed for each variable that is converted. Set {cmd:process(0)} to skip this conversion and pass all variables as-is. By default, any labelled variables are passed 
+from Stata to Julia as categorical variables, however this may not always be desired (e.g. the case of a labelled numeric variable). This argument attempts to rectify this potential issue.{p_end}
 {synoptline}
 {p2colreset}{...}
 
@@ -411,6 +441,13 @@ must both be identically formatted strings matching one of the compatible date f
 {phang}
 - If using {cmd:gvar()}, both {cmd:time()} and {cmd:gvar()} should either both be numeric variables or both be string variables of the same format
 
+{title:Further Reading}
+
+{pstd}
+For a deeper dive into the backend implementation, see the DiDInt.jl package documentation:{p_end}
+{pstd}
+{browse "https://ebjamieson97.github.io/DiDInt.jl/stable/details/"}{p_end}
+
 {title:Package Author}
 
 {pstd}
@@ -435,6 +472,6 @@ with Few Treated Clusters." {browse "https://www.sciencedirect.com/science/artic
 
 {* didintjl                                           }
 {* written by Eric Jamieson                           }
-{* version 0.7.5 2026-04-08                           }
+{* version 0.7.7 2026-06-07                           }
 
 {smcl}

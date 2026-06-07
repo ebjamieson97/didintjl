@@ -1,8 +1,8 @@
-*! didintjl 0.7.6 13 May 2026
+*! didintjl 0.7.7 June 6th 2026
 /*------------------------------------*/
 /*didintjl*/
 /*written by Eric Jamieson */
-/*version 0.7.6 2026-05-13 */
+/*version 0.7.7 2026-06-07 */
 /*------------------------------------*/
 
 cap program drop didintjl
@@ -13,7 +13,7 @@ program define didintjl, rclass
             treated_states(string) treatment_times(string) date_format(string) /// 
             covariates(string) ccc(string) agg(string) weighting(string) ref_column(string) ref_group(string) ///
             freq(string) freq_multiplier(int 1) start_date(string) end_date(string) ///
-            nperm(int 999) seed(int 0) use_pre_controls(int 0) hc(int 3) truejack(int 0) edgecase(int 0) process(int 1)]
+            nperm(int 999) seed(int 0) use_pre_controls(int 0) notyet(int -1) hc(int 1) truejack(int 0) edgecase(int 0) process(int 1)]
 
 	// PART ONE: BASIC SETUP 
     qui cap which jl
@@ -58,6 +58,14 @@ program define didintjl, rclass
         di as error "edgecase must be either 1 (true) or 0 (false)."
     }
 
+    // notyet arg
+    if `notyet' >= 0 {
+        if `notyet' != 0 & `notyet' != 1 {
+            di as error "'notyet' must be either 1 (true) or 0 (false)."
+        }
+        `use_pre_controls' = `notyet'
+    }
+
     // Check use_pre_controls arg
     if `use_pre_controls' == 1 {
         qui jl: use_pre_controls = true
@@ -81,14 +89,19 @@ program define didintjl, rclass
         qui jl: date_format = "`date_format'"
     }
 
-    // Check that DiDInt.jl for Julia is installed
+    // Check that DiDInt.jl v0.9.5 or later is installed
+    tempname DiDIntOK
     qui jl: using Pkg
-    qui jl: if Base.find_package("DiDInt") === nothing              ///
-            SF_display("DiDInt.jl not installed, installing now.");  ///
-            Pkg.add(url="https://github.com/ebjamieson97/DiDInt.jl"); ///
-            SF_display(" DiDInt.jl is done installing.");             ///
-        end        
+    qui jl: _didint_pkgs = filter(p -> p.second.name == "DiDInt", Pkg.dependencies())
+    qui jl: _didint_ok = !isempty(_didint_pkgs) && first(values(_didint_pkgs)).version >= v"0.9.5"
+    qui jl: SF_scal_save("`DiDIntOK'", _didint_ok ? 1.0 : 0.0)
+    if `DiDIntOK' != 1 {
+        di as error "DiDInt.jl v0.9.5 or later is required but not found."
+        di as error "Please install or update DiDInt.jl by running: jl AddPkg DiDInt"
+        exit 44
+    }
     qui jl: using DiDInt
+
 
     // This section is to deal with the invalid warnings and to ensure proper conversion of categorical variables
     local allvars `outcome' `state' `time'
@@ -629,6 +642,7 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+*0.7.7 - No longer automatically download DiDInt, instead suggest user download explicitly via 'jl AddPkg DiDInt'
 *0.7.6 - Added arg for edgecase, made sure value labels are dropped for outcome
 *0.7.5 - Added better processing for labelled variables
 *0.7.4 - better error messaging

@@ -1,7 +1,8 @@
+*! didintjl_plot 0.0.3 June 7th 2026
 /*------------------------------------*/
 /*didintjl_plot*/
 /*written by Eric Jamieson */
-/*version 0.0.2 2025-12-06 */
+/*version 0.0.3 2026-07-06 */
 /*------------------------------------*/
 
 cap program drop didintjl_plot
@@ -12,13 +13,19 @@ program define didintjl_plot
             treated_states(string) treatment_times(string) date_format(string) /// 
             covariates(string) ccc(string) weights(int 1) ref_column(string) ref_group(string) ///
             freq(string) freq_multiplier(int 1) start_date(string) end_date(string) ///
-            hc(int 3) event(int 0) ci(real 0.95) groupmin(int 3) window(numlist min=2 max=2)]
+            hc(int 1) event(int 0) ci(real 0.95) groupmin(int 3) window(numlist min=2 max=2) process(int 1)]
 
 	// PART ONE: BASIC SETUP 
     qui cap which jl
     if _rc {
         di as error "The 'julia' package is required but not installed or not found in the system path. See https://github.com/droodman/julia.ado for more details."
         exit 3
+    }
+
+    // Check process
+    if `process' != 0 & `process' != 1 {
+        di as error "process must be either 1 (true) or 0 (false)."
+        exit 42
     }
 
     // Pass hc, event, and ci args to julia
@@ -42,16 +49,61 @@ program define didintjl_plot
         qui jl: date_format = "`date_format'"
     }
 
-    // Check that DiDInt.jl for Julia is installed
+    // Check that DiDInt.jl v0.9.5 or later is installed
+    tempname DiDIntOK
     qui jl: using Pkg
-    jl: if Base.find_package("DiDInt") === nothing              ///
-            SF_display("DiDInt.jl not installed, installing now.");  ///
-            Pkg.add(url="https://github.com/ebjamieson97/DiDInt.jl"); ///
-            SF_display(" DiDInt.jl is done installing.");             ///
-        end        
+    qui jl: _didint_pkgs = filter(p -> p.second.name == "DiDInt", Pkg.dependencies())
+    qui jl: _didint_ok = !isempty(_didint_pkgs) && first(values(_didint_pkgs)).version >= v"0.9.5"
+    qui jl: SF_scal_save("`DiDIntOK'", _didint_ok ? 1.0 : 0.0)
+    if `DiDIntOK' != 1 {
+        di as error "DiDInt.jl v0.9.5 or later is required but not found."
+        di as error "Please install or update DiDInt.jl by running: jl AddPkg DiDInt"
+        exit 44
+    }
     qui jl: using DiDInt
 
-    qui jl save data
+    // This section is to deal with the invalid warnings and to ensure proper conversion of categorical variables
+    local allvars `outcome' `state' `time'
+    if "`covariates'" != "" {
+        local allvars `allvars' `covariates'
+    }
+    if "`gvar'" != "" {
+        local allvars `allvars' `gvar'
+    }
+    preserve
+    keep `allvars'
+    if `process' == 1 {
+        local outlabel : value label `outcome'
+        if "`outlabel'" != "" {
+            quietly label values `outcome' .
+            di as text "Warning: `outcome' has a value label. Label stripped to ensure numeric outcome. Set 'process(0)' to skip this conversion."
+        }
+        foreach v of local covariates {
+            local vallabel : value label `v'
+            if "`vallabel'" != "" {
+                quietly decode `v', gen(`v'_decoded)
+                quietly destring `v'_decoded, gen(`v'_test) ignore(",")
+                quietly count if missing(`v'_test) & !missing(`v')
+                if r(N) == 0 {
+                    local converted 1
+                    // Truly numeric - just strip label
+                    drop `v'_decoded `v'_test
+                    quietly label values `v' .
+                    di as text "Warning: `v' has a value label but contains numeric data. Value label stripped, variable passed as numeric. Set 'process(0)' to skip this conversion."
+                }
+                else {
+                    // Real categorical - replace with decoded string
+                    drop `v' `v'_test
+                    rename `v'_decoded `v'
+                    di as text "Warning: `v' has a value label and contains non-numeric data. Variable converted from numeric to string. Set 'process(0)' to skip this conversion."
+                }
+            }
+        }
+        qui label drop _all
+        qui notes drop _all
+    }
+    qui jl save df
+    restore
 
     // Allow some variables to be passed to Julia 
     qui jl: outcome = Symbol("`outcome'")
@@ -206,16 +258,14 @@ program define didintjl_plot
     }
 
     // PART TWO: Run didint_plot in Julia
-	jl: plot_data = DiDInt.didint_plot(outcome, state, time, data, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ref = ref, ccc = ccc, event = event, weights = weights, ci = ci, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, hc = hc)
+	jl: plot_data = DiDInt.didint_plot(outcome, state, time, df, gvar = gvar, treated_states = treated_states, treatment_times = treated_times, date_format = date_format, covariates = covariates, ref = ref, ccc = ccc, event = event, weights = weights, ci = ci, freq = freq, freq_multiplier = freq_multiplier, start_date = start_date, end_date = end_date, hc = hc);
 	if `event' == 0 {
         // Get treatment periods from data
         qui jl: treat_period = string.(collect(skipmissing(plot_data[!, "treat_period"])))
-        qui jl: st_local("treat_periods", join(string.(treat_period), " "))  // Changed name!
+        qui jl: st_local("treat_periods", join(string.(treat_period), " "))
         qui jl: n_treat = length(collect(treat_period))
         qui jl: plot_data = plot_data[1:(end-n_treat), Not(:treat_period)]
     }
-
-    jl: plot_data
 
     // PART THREE: PASS RESULTS TO STATA
     tempname result_frame
@@ -464,5 +514,6 @@ end
 /*--------------------------------------*/
 /* Change Log */
 /*--------------------------------------*/
+* 0.0.3 - changed default hc value to 1 (from 3)
 * 0.0.2 - Got everything working with Julia v1.11.7, julia.ado v1.2.2 & DiDInt.jl v0.6.15
 * 0.0.1 - created function
