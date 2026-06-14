@@ -20,3 +20,6 @@ f didintjl.ado
 f didintjl.sthlp
 f didintjl_plot.ado
 f didintjl_plot.sthlp
+f didintjl_example.do
+f didintjl_plot_example.do
+f MeritExampleDataDiDIntjl.dta
